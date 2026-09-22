@@ -144,7 +144,7 @@ default.
 5. Use the generated HTTPS service URL as the gateway's backend base URL:
 
    ```text
-   https://<service-name>.onrender.com/api/v1/verify
+   https://authentichain.onrender.com/api/v1/verify
    ```
 
 The Render service receives database host, port, name, user, and password from the
@@ -156,13 +156,13 @@ or NTAG AES keys.
 The backend verifies NTAG 424 DNA SDM/SUN URLs at:
 
 ```text
-GET https://<service-name>.onrender.com/nfc/v1/verify
+GET https://authentichain.onrender.com/nfc/v1/verify
 ```
 
 Configure the tag's SDM/SUN NDEF URL to use this path. A generated URL looks like:
 
 ```text
-https://<service-name>.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
+https://authentichain.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
 ```
 
 The endpoint derives the NTAG 424 SDM session key, validates the URL CMAC, checks

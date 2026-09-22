@@ -1,6 +1,6 @@
 services:
   - type: web
-    name: product-auth-api
+    name: authentichain
     runtime: docker
     plan: free
     envVars:
