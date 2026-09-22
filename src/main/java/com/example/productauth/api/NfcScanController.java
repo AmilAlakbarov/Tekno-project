@@ -17,7 +17,7 @@ public class NfcScanController {
 
     private static final Logger log = LoggerFactory.getLogger(NfcScanController.class);
 
-    @GetMapping(produces = MediaType.APPLICATION_JSON_VALUE)
+    @GetMapping(path = {"", "/v1/verify"}, produces = MediaType.APPLICATION_JSON_VALUE)
     public Map<String, Object> receiveNfcMessage(
             @RequestParam Map<String, String> parameters) {
         log.info("NFC SDM request received: parameters={}", parameters.keySet());
