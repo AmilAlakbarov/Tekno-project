@@ -1,0 +1,8 @@
+.git
+.github
+target
+*.iml
+.idea
+*.log
+Tekno_Uno
+Tekno_NANO

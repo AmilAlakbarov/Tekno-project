@@ -1,0 +1,34 @@
+services:
+  - type: web
+    name: product-auth-api
+    runtime: docker
+    plan: free
+    envVars:
+      - key: DB_HOST
+        fromDatabase:
+          name: product-auth-db
+          property: host
+      - key: DB_PORT
+        fromDatabase:
+          name: product-auth-db
+          property: port
+      - key: DB_NAME
+        fromDatabase:
+          name: product-auth-db
+          property: database
+      - key: DB_USERNAME
+        fromDatabase:
+          name: product-auth-db
+          property: user
+      - key: DB_PASSWORD
+        fromDatabase:
+          name: product-auth-db
+          property: password
+      - key: FIREBASE_ENABLED
+        value: "false"
+
+databases:
+  - name: product-auth-db
+    databaseName: product_auth
+    user: product_auth
+    plan: free

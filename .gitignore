@@ -1,0 +1,7 @@
+.idea/
+.vscode/
+target/
+*.iml
+.env
+service-account*.json
+firebase-service-account*.json

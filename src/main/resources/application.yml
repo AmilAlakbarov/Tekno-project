@@ -1,0 +1,28 @@
+spring:
+  application:
+    name: product-auth-api
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:127.0.0.1}:${DB_PORT:5433}/${DB_NAME:product_auth}}
+    username: ${DB_USERNAME:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+
+firebase:
+  enabled: ${FIREBASE_ENABLED:false}
+  service-account-json: ${FIREBASE_SERVICE_ACCOUNT_JSON:}
+  project-id: ${FIREBASE_PROJECT_ID:}
+
+logging:
+  level:
+    com.example.productauth: INFO
