@@ -6,11 +6,6 @@ spring:
     username: ${DB_USERNAME:postgres}
     password: ${DB_PASSWORD:postgres}
     driver-class-name: org.postgresql.Driver
-server:
-  forward-headers-strategy: framework
-
-app:
-  public-base-url: ${PUBLIC_BASE_URL:}
   jpa:
     open-in-view: false
     hibernate:
@@ -23,8 +18,11 @@ app:
     enabled: true
     locations: classpath:db/migration
 
-database:
-  reset-on-startup: ${DATABASE_RESET_ON_STARTUP:false}
+server:
+  forward-headers-strategy: framework
+
+app:
+  public-base-url: ${PUBLIC_BASE_URL:}
 
 firebase:
   enabled: ${FIREBASE_ENABLED:false}
