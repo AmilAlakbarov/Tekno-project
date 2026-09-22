@@ -43,13 +43,13 @@ Override `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` when required.
 The tag URL must point to:
 
 ```text
-https://authentichain.onrender.com/nfc/v1/verify
+https://authentichain.website/nfc/v1/verify
 ```
 
 A generated request has this shape:
 
 ```text
-https://authentichain.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
+https://authentichain.website/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
 ```
 
 The service:
@@ -132,7 +132,7 @@ The repository contains [Dockerfile](./Dockerfile) and
 1. Push the repository to GitHub.
 2. In Render, choose **New > Blueprint** and select the repository.
 3. Use the web service name `authentichain`.
-4. Confirm the public URL is `https://authentichain.onrender.com`.
+4. Confirm the custom public URL is `https://authentichain.website`.
 5. Redeploy after changing the tag URL hostname.
 
 The hostname is part of the signed SDM URL. After changing from another

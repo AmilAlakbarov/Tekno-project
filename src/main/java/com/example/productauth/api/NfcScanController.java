@@ -67,10 +67,12 @@ public class NfcScanController {
     private ResponseEntity<String> page(String status, String message, String uid, String counter,
             String cmac, ProductSummary product) {
         boolean authentic = "REAL".equalsIgnoreCase(status);
-        String title = authentic ? "Authentic product" : "Verification failed";
+        boolean replay = "REPLAY_ATTACK".equalsIgnoreCase(status)
+                || (message != null && message.toLowerCase(Locale.ROOT).contains("replay"));
+        String title = authentic ? "Authentic product" : replay ? "Replay detected" : "Verification failed";
         String safeMessage = escape(message);
-        String productName = product == null ? "Unknown product" : escape(product.name());
-        String manufacturer = product == null ? "No registered product matched this scan"
+        String productName = product == null ? "Product not verified" : escape(product.name());
+        String manufacturer = product == null ? "Authentication did not complete successfully"
                 : escape(product.manufacturer());
         String details = uid == null ? "Scan data was not complete enough to display."
                 : "UID " + escape(uid.toUpperCase(Locale.ROOT))
@@ -78,7 +80,12 @@ public class NfcScanController {
         String macDetail = cmac == null ? "" : "<span>CMAC " + escape(cmac.toUpperCase(Locale.ROOT)) + "</span>";
         String icon = authentic
                 ? "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>"
+                : replay
+                ? "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M3 12a9 9 0 1 0 3-6.7\"/><path d=\"M3 4v6h6\"/><path d=\"M12 7v5l3 2\"/></svg>"
                 : "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M18 6 6 18M6 6l12 12\"/></svg>";
+        String accentBackground = authentic ? "#e6f5f1" : replay ? "#fff7df" : "#fff0ef";
+        String accentColor = authentic ? "#087f6b" : replay ? "#a86b00" : "#c84b45";
+        String eyebrow = authentic ? "Verified" : replay ? "Security warning" : "Not verified";
 
         String html = """
                 <!doctype html>
@@ -149,9 +156,8 @@ public class NfcScanController {
                   </main>
                 </body>
                 </html>
-                """.formatted(title, authentic ? "#e6f5f1" : "#fff0ef", authentic ? "#087f6b" : "#c84b45",
-                authentic ? "#087f6b" : "#c84b45", authentic ? "#e6f5f1" : "#fff0ef",
-                authentic ? "#087f6b" : "#c84b45", icon, authentic ? "Verified" : "Not verified",
+                """.formatted(title, accentBackground, accentColor, accentColor, accentBackground,
+                accentColor, icon, eyebrow,
                 title, safeMessage, productName, manufacturer, details, macDetail);
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
