@@ -151,6 +151,27 @@ The Render service receives database host, port, name, user, and password from t
 managed database. Do not commit database passwords, Firebase service-account JSON,
 or NTAG AES keys.
 
+### Testing an NTAG 424 URL
+
+The backend also exposes a diagnostic receiver at:
+
+```text
+GET https://<service-name>.onrender.com/nfc
+```
+
+Configure the tag's SDM/SUN NDEF URL to use this path while testing, for example:
+
+```text
+https://<service-name>.onrender.com/nfc?e=...&c=...
+```
+
+The `e` and `c` values are placeholders here; configure the exact encrypted-data
+and SDM MAC placeholders and offsets required by the tag. When the tag is tapped
+with an NFC-capable phone, the endpoint returns JSON with `status: RECEIVED`.
+Render application logs record that an NFC request arrived and list the received
+parameter names. This endpoint only proves that the URL reached the service; it
+does not yet verify the NTAG 424 SDM MAC. Do not log or commit AES keys.
+
 Render database changes should be made with a new Flyway migration in
 `src/main/resources/db/migration`, for example `V4__insert_real_tags.sql`. Do not
 edit migrations that have already run. For one-off inspection or emergency
