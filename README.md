@@ -153,24 +153,24 @@ or NTAG AES keys.
 
 ### Testing an NTAG 424 URL
 
-The backend also exposes a diagnostic receiver at:
+The backend verifies NTAG 424 DNA SDM/SUN URLs at:
 
 ```text
-GET https://<service-name>.onrender.com/nfc
+GET https://<service-name>.onrender.com/nfc/v1/verify
 ```
 
-Configure the tag's SDM/SUN NDEF URL to use this path while testing, for example:
+Configure the tag's SDM/SUN NDEF URL to use this path. A generated URL looks like:
 
 ```text
-https://<service-name>.onrender.com/nfc?e=...&c=...
+https://<service-name>.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
 ```
 
-The `e` and `c` values are placeholders here; configure the exact encrypted-data
-and SDM MAC placeholders and offsets required by the tag. When the tag is tapped
-with an NFC-capable phone, the endpoint returns JSON with `status: RECEIVED`.
-Render application logs record that an NFC request arrived and list the received
-parameter names. This endpoint only proves that the URL reached the service; it
-does not yet verify the NTAG 424 SDM MAC. Do not log or commit AES keys.
+The endpoint derives the NTAG 424 SDM session key, validates the URL CMAC, checks
+the tag status, and rejects replayed counters. It returns `REAL` only for an
+active tag with a valid, newer counter. Revoked, unknown, invalid, and replayed
+tags return `FAKE`. The current five demonstration tags are inserted by
+`V4__insert_project_tags.sql`; the all-zero AES key is for development only.
+Replace it with unique production keys before shipping.
 
 Render database changes should be made with a new Flyway migration in
 `src/main/resources/db/migration`, for example `V4__insert_real_tags.sql`. Do not

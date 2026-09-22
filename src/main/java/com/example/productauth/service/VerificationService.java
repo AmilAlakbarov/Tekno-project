@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.Locale;
 import java.util.Optional;
 
 @Service
@@ -69,8 +70,53 @@ public class VerificationService {
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
+    @Transactional
+    public VerifyResponse verifySdm(String uid, String counterHex, String incomingCmac, String macInput) {
+        String normalizedUid = uid.toUpperCase(Locale.ROOT);
+        String normalizedCounter = counterHex.toUpperCase(Locale.ROOT);
+        String normalizedCmac = incomingCmac.toUpperCase(Locale.ROOT);
+
+        Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(normalizedUid);
+        if (tagOptional.isEmpty()) {
+            return recordFailure(normalizedUid, ScanResult.NOT_FOUND, null, "Product could not be found.");
+        }
+
+        NfcTag tag = tagOptional.get();
+        if (tag.getStatus() != TagStatus.ACTIVE) {
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+        }
+
+        int counter;
+        try {
+            counter = parseCounter(normalizedCounter);
+        } catch (NumberFormatException exception) {
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+        }
+
+        if (counter <= tag.getLastScanCounter()) {
+            return recordFailure(normalizedUid, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.");
+        }
+
+        if (!signatureVerificationService.matchesNtag424Sdm(
+                normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey())) {
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+        }
+
+        tag.setLastScanCounter(counter);
+        nfcTagRepository.save(tag);
+        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL);
+        firebaseScanPublisher.publish(scanLog, tag.getProduct().getId().toString());
+        return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
+    }
+
     private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message) {
         ScanLog scanLog = saveLog(request, result);
+        firebaseScanPublisher.publish(scanLog, tag == null ? null : tag.getProduct().getId().toString());
+        return VerifyResponse.fake(message);
+    }
+
+    private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message) {
+        ScanLog scanLog = saveLog(uid, result);
         firebaseScanPublisher.publish(scanLog, tag == null ? null : tag.getProduct().getId().toString());
         return VerifyResponse.fake(message);
     }
@@ -78,6 +124,10 @@ public class VerificationService {
     private ScanLog saveLog(VerifyRequest request, ScanResult result) {
         return scanLogRepository.save(new ScanLog(
                 request.uid().toUpperCase(), request.latitude(), request.longitude(), result));
+    }
+
+    private ScanLog saveLog(String uid, ScanResult result) {
+        return scanLogRepository.save(new ScanLog(uid, null, null, result));
     }
 
     private boolean hasSpeedAnomaly(VerifyRequest request, String uid) {
