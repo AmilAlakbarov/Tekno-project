@@ -166,9 +166,10 @@ https://<service-name>.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&
 ```
 
 The endpoint derives the NTAG 424 SDM session key, validates the URL CMAC, checks
-the tag status, and rejects replayed counters. It returns `REAL` only for an
+the tag status, and rejects replayed counters. It returns a clean branded HTML
+verification page rather than a JSON response. The page shows `REAL` only for an
 active tag with a valid, newer counter. Revoked, unknown, invalid, and replayed
-tags return `FAKE`. The current five demonstration tags are inserted by
+tags show `FAKE`. The current five demonstration tags are inserted by
 `V4__insert_project_tags.sql`; the all-zero AES key is for development only.
 Replace it with unique production keys before shipping.
 
