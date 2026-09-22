@@ -144,7 +144,7 @@ default.
 5. Use the generated HTTPS service URL as the gateway's backend base URL:
 
    ```text
-   https://authentichain.onrender.com/api/v1/verify
+   https://authentichain-c3ky.onrender.com/api/v1/verify
    ```
 
 The Render service receives database host, port, name, user, and password from the
@@ -156,22 +156,35 @@ or NTAG AES keys.
 The backend verifies NTAG 424 DNA SDM/SUN URLs at:
 
 ```text
-GET https://authentichain.onrender.com/nfc/v1/verify
+GET https://authentichain-c3ky.onrender.com/nfc/v1/verify
 ```
 
 Configure the tag's SDM/SUN NDEF URL to use this path. A generated URL looks like:
 
 ```text
-https://authentichain.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
+https://authentichain-c3ky.onrender.com/nfc/v1/verify?uid=041888521F1E90&ctr=000013&cmac=9FDA395E5774C71C
 ```
 
 The endpoint derives the NTAG 424 SDM session key, validates the URL CMAC, checks
 the tag status, and rejects replayed counters. It returns a clean branded HTML
 verification page rather than a JSON response. The page shows `REAL` only for an
 active tag with a valid, newer counter. Revoked, unknown, invalid, and replayed
-tags show `FAKE`. The current five demonstration tags are inserted by
-`V4__insert_project_tags.sql`; the all-zero AES key is for development only.
+tags show `FAKE`. Migration `V5__reset_demo_tags.sql` resets the demonstration
+database to two REAL tags, two FAKE tags, and one replay-test tag
+(`042166521F1E90`). The all-zero AES key is for development only.
 Replace it with unique production keys before shipping.
+
+The current demo state is reset by `V5__reset_demo_tag_state.sql`:
+`049D45521F1E90` and `041888521F1E90` are real, `045E0A521F1E90` and
+`045173D2151990` are fake, and `042166521F1E90` is reserved for replay testing
+with counter `000002`.
+
+For the hosted demonstration service, `DATABASE_RESET_ON_STARTUP=true` clears
+scan logs and resets counters whenever the application starts (including after
+a Render deployment). The UID `042166521F1E90` is initialized at counter `2`,
+so its captured counter `000002` is intentionally shown as a replay attack.
+Disable this setting before production use because persistent replay protection
+must not be reset on deployment.
 
 Render database changes should be made with a new Flyway migration in
 `src/main/resources/db/migration`, for example `V4__insert_real_tags.sql`. Do not

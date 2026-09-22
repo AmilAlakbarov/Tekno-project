@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.beans.factory.annotation.Value;
 import com.example.productauth.api.dto.ProductSummary;
 import com.example.productauth.api.dto.VerifyResponse;
 import com.example.productauth.service.VerificationService;
@@ -24,9 +25,12 @@ public class NfcScanController {
 
     private static final Logger log = LoggerFactory.getLogger(NfcScanController.class);
     private final VerificationService verificationService;
+    private final String publicBaseUrl;
 
-    public NfcScanController(VerificationService verificationService) {
+    public NfcScanController(VerificationService verificationService,
+            @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.verificationService = verificationService;
+        this.publicBaseUrl = publicBaseUrl;
     }
 
     @GetMapping(path = {"", "/v1/verify"}, produces = MediaType.TEXT_HTML_VALUE)
@@ -52,7 +56,10 @@ public class NfcScanController {
                     uid, counter, null, null);
         }
 
-        String macInput = request.getRequestURL().toString() + "?" + query.substring(0, cmacIndex + 5);
+        String requestBaseUrl = publicBaseUrl.isBlank()
+                ? request.getRequestURL().toString()
+                : publicBaseUrl + request.getRequestURI();
+        String macInput = requestBaseUrl + "?" + query.substring(0, cmacIndex + 5);
         VerifyResponse result = verificationService.verifySdm(uid, counter, cmac, macInput);
         return page(result.status(), result.message(), uid, counter, cmac, result.product());
     }

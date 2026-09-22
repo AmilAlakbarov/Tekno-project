@@ -4,6 +4,8 @@ services:
     runtime: docker
     plan: free
     envVars:
+      - key: PUBLIC_BASE_URL
+        value: https://authentichain.onrender.com
       - key: DB_HOST
         fromDatabase:
           name: product-auth-db
