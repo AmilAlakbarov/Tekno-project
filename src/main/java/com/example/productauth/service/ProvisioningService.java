@@ -91,13 +91,15 @@ public class ProvisioningService {
                     invalid++;
                     continue;
                 }
+                // Re-importing a CSV also restores an HSM key after a development
+                // service reset, without creating a duplicate tag row.
+                hsmClient.importKey(uid, aesKey);
                 if (!fileUids.add(uid) || nfcTagRepository.existsByTagUid(uid)) {
                     duplicates++;
                     continue;
                 }
                 Product product = productRepository.findById(UUID.fromString(productId))
                         .orElseThrow(() -> new IllegalArgumentException("Product was not found: " + productId));
-                hsmClient.importKey(uid, aesKey);
                 NfcTag tag = new NfcTag(UUID.randomUUID(), product, uid,
                         hsmClient.isConfigured() ? null : aesKey);
                 if (columns.length > 3) tag.setDisplayName(blankToNull(columns[3]));

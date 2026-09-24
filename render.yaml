@@ -53,8 +53,26 @@ services:
     envVars:
       - key: HSM_SERVICE_TOKEN
         sync: false
-      - key: HSM_DATABASE_PATH
-        value: /tmp/hsm.sqlite3
+      - key: HSM_DB_HOST
+        fromDatabase:
+          name: product-auth-db
+          property: host
+      - key: HSM_DB_PORT
+        fromDatabase:
+          name: product-auth-db
+          property: port
+      - key: HSM_DB_NAME
+        fromDatabase:
+          name: product-auth-db
+          property: database
+      - key: HSM_DB_USER
+        fromDatabase:
+          name: product-auth-db
+          property: user
+      - key: HSM_DB_PASSWORD
+        fromDatabase:
+          name: product-auth-db
+          property: password
 
 databases:
   - name: product-auth-db

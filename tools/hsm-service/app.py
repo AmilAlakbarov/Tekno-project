@@ -1,7 +1,7 @@
 """Small development HSM-like HTTP service.
 
 The service deliberately returns metadata only. AES keys remain inside the
-SQLite-backed service and are never included in an HTTP response.
+PostgreSQL-backed service and are never included in an HTTP response.
 """
 
 from __future__ import annotations
@@ -11,32 +11,39 @@ import binascii
 import hmac
 import json
 import os
-import sqlite3
 from http import HTTPStatus
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from typing import Any
 
 from cryptography.hazmat.primitives.cmac import CMAC
 from cryptography.hazmat.primitives.ciphers import algorithms
+import psycopg
 
 
-DB_PATH = os.environ.get("HSM_DATABASE_PATH", os.environ.get("HSM_DB_PATH", "/data/hsm.sqlite3"))
+DATABASE_URL = os.environ.get("HSM_DATABASE_URL")
+DB_CONFIG = {
+    "host": os.environ.get("HSM_DB_HOST", "localhost"),
+    "port": os.environ.get("HSM_DB_PORT", "5432"),
+    "dbname": os.environ.get("HSM_DB_NAME", "hsm"),
+    "user": os.environ.get("HSM_DB_USER", "hsm"),
+    "password": os.environ.get("HSM_DB_PASSWORD", ""),
+}
 API_TOKEN = os.environ.get("HSM_SERVICE_TOKEN", os.environ.get("HSM_API_TOKEN", ""))
 MAX_BODY_BYTES = 64 * 1024
 
 
-def _database() -> sqlite3.Connection:
-    path = Path(DB_PATH)
-    if str(path) != ":memory:":
-        path.parent.mkdir(parents=True, exist_ok=True)
-    connection = sqlite3.connect(path, timeout=10)
+def _database() -> psycopg.Connection:
+    connection = (
+        psycopg.connect(DATABASE_URL, connect_timeout=10)
+        if DATABASE_URL
+        else psycopg.connect(connect_timeout=10, **DB_CONFIG)
+    )
     connection.execute(
         """
         CREATE TABLE IF NOT EXISTS keys (
             uid TEXT PRIMARY KEY,
-            aes_key BLOB NOT NULL,
-            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+            aes_key BYTEA NOT NULL,
+            created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP
         )
         """
     )
@@ -118,7 +125,7 @@ class HsmHandler(BaseHTTPRequestHandler):
                 self._verify_ntag424(body)
         except ValueError as error:
             _json_response(self, HTTPStatus.BAD_REQUEST, {"error": str(error)})
-        except sqlite3.Error:
+        except psycopg.Error:
             _json_response(self, HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "storage_error"})
 
     def _authenticated(self) -> bool:
@@ -148,7 +155,7 @@ class HsmHandler(BaseHTTPRequestHandler):
         uid_text = uid.hex().upper()
         with _database() as connection:
             connection.execute(
-                "INSERT INTO keys(uid, aes_key) VALUES(?, ?) "
+                "INSERT INTO keys(uid, aes_key) VALUES(%s, %s) "
                 "ON CONFLICT(uid) DO UPDATE SET aes_key=excluded.aes_key",
                 (uid_text, aes_key),
             )
@@ -160,7 +167,7 @@ class HsmHandler(BaseHTTPRequestHandler):
         message = _message(body)
         uid_text = uid.hex().upper()
         with _database() as connection:
-            row = connection.execute("SELECT aes_key FROM keys WHERE uid=?", (uid_text,)).fetchone()
+            row = connection.execute("SELECT aes_key FROM keys WHERE uid=%s", (uid_text,)).fetchone()
         if row is None:
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "unknown_uid"})
             return
@@ -179,7 +186,7 @@ class HsmHandler(BaseHTTPRequestHandler):
             raise ValueError("mac_input must not exceed 2048 UTF-8 bytes")
         uid_text = uid.hex().upper()
         with _database() as connection:
-            row = connection.execute("SELECT aes_key FROM keys WHERE uid=?", (uid_text,)).fetchone()
+            row = connection.execute("SELECT aes_key FROM keys WHERE uid=%s", (uid_text,)).fetchone()
         if row is None:
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "unknown_uid"})
             return

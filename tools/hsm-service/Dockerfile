@@ -5,7 +5,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY app.py .
 
-ENV HSM_DB_PATH=/data/hsm.sqlite3
 ENV PORT=8080
 EXPOSE 8080
 

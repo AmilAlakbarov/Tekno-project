@@ -2,10 +2,10 @@
 
 This is a separate, development-only HTTP service for storing UID/AES records
 and performing AES-CMAC checks. It is intentionally independent of the Java
-application and dashboard. Keys are stored in SQLite and are never returned by
-the API. Render's free tier cannot use persistent disks, so a free deployment
-has ephemeral storage and its key store can be reset on restart or redeploy.
-Do not use it for real production keys.
+application and dashboard. Keys are stored in PostgreSQL and are never returned
+by the API. This remains a development-oriented service; use a separately
+secured database (and preferably a separate database or schema) for production
+HSM data.
 
 ## Run locally
 
@@ -13,15 +13,33 @@ Do not use it for real production keys.
 cd tools/hsm-service
 python -m pip install -r requirements.txt
 $env:HSM_API_TOKEN="replace-with-a-long-random-token"
-$env:HSM_DB_PATH="hsm.sqlite3"
+$env:HSM_DB_HOST="localhost"
+$env:HSM_DB_PORT="5432"
+$env:HSM_DB_NAME="hsm"
+$env:HSM_DB_USER="hsm"
+$env:HSM_DB_PASSWORD="replace-with-a-database-password"
+# Alternatively, use one PostgreSQL connection string:
+# $env:HSM_DATABASE_URL="postgresql://hsm:password@localhost:5432/hsm"
 python app.py
 ```
 
-For Render, create a Python web service with this directory as its root,
-set `HSM_SERVICE_TOKEN` as a secret environment variable, and use
-`HSM_DATABASE_PATH=/tmp/hsm.sqlite3`. Render supplies `PORT`; the container
-listens on it. Use a paid persistent disk or a managed encrypted database
-before production.
+The service creates its `keys` table automatically on startup. `PORT` is read
+from the environment (default `8080`), and `HSM_SERVICE_TOKEN` (or the legacy
+`HSM_API_TOKEN`) protects all non-health endpoints.
+
+## Render and database persistence
+
+The included `render.yaml` wires the HSM service to the managed
+`product-auth-db` PostgreSQL instance using `HSM_DB_HOST`, `HSM_DB_PORT`,
+`HSM_DB_NAME`, `HSM_DB_USER`, and `HSM_DB_PASSWORD`. Render supplies `PORT`.
+This shared PostgreSQL database is acceptable for development, but production
+should use a separate database or schema with appropriately restricted
+credentials and backups. Do not use a filesystem/SQLite path or rely on a
+Render web-service disk for key persistence.
+
+To use another PostgreSQL instance, replace those Render `fromDatabase`
+settings with environment values, or set `HSM_DATABASE_URL` as a secret. When
+present, `HSM_DATABASE_URL` overrides the individual `HSM_DB_*` settings.
 
 ## API contract
 
