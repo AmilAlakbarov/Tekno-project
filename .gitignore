@@ -10,3 +10,5 @@ tools/simulator/simulator_vault.json
 tools/simulator/provisioning_manifest.json
 tools/simulator/provisioning_keys.csv
 tools/simulator/.venv/
+scripts/*
+TESTING_AND_JURY_DEMO.md
