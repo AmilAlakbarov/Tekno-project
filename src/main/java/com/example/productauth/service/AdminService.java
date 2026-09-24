@@ -31,8 +31,8 @@ public class AdminService {
     @Transactional(readOnly = true)
     public AdminDtos.Overview overview() {
         Instant since = Instant.now().minus(24, ChronoUnit.HOURS);
-        long scans = scanLogRepository.countByScannedAtAfter(since);
-        long successful = scanLogRepository.countByScannedAtAfterAndScanResult(since, ScanResult.REAL);
+        long scans = scanLogRepository.countDistinctEventsAfter(since);
+        long successful = scanLogRepository.countDistinctSuccessfulEventsAfter(since);
         double successRate = scans == 0 ? 0 : (successful * 100.0) / scans;
         return new AdminDtos.Overview(
                 nfcTagRepository.countByStatus(TagStatus.ACTIVE),
@@ -75,6 +75,15 @@ public class AdminService {
         var tag = nfcTagRepository.findByTagUid(normalizedUid)
                 .orElseThrow(() -> new EntityNotFoundException("Tag was not found: " + normalizedUid));
         tag.setStatus(TagStatus.REVOKED);
+        return AdminDtos.TagRow.from(nfcTagRepository.save(tag));
+    }
+
+    @Transactional
+    public AdminDtos.TagRow activate(String uid) {
+        String normalizedUid = uid.toUpperCase(Locale.ROOT);
+        var tag = nfcTagRepository.findByTagUid(normalizedUid)
+                .orElseThrow(() -> new EntityNotFoundException("Tag was not found: " + normalizedUid));
+        tag.setStatus(TagStatus.ACTIVE);
         return AdminDtos.TagRow.from(nfcTagRepository.save(tag));
     }
 }

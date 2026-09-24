@@ -24,11 +24,13 @@ public final class AdminDtos {
         }
     }
 
-    public record ScanRow(String uid, Instant timestamp, ScanResult result,
-                          Double latitude, Double longitude) {
+    public record ScanRow(String id, String uid, Instant timestamp, ScanResult result,
+                          Double latitude, Double longitude, Integer receivedCounter,
+                          Integer expectedCounter) {
         public static ScanRow from(ScanLog log) {
-            return new ScanRow(log.getTagUid(), log.getScannedAt(), log.getScanResult(),
-                    log.getLatitude(), log.getLongitude());
+            return new ScanRow(log.getId().toString(), log.getTagUid(), log.getScannedAt(),
+                    log.getScanResult(), log.getLatitude(), log.getLongitude(),
+                    log.getReceivedCounter(), log.getExpectedCounter());
         }
     }
 

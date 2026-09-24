@@ -55,4 +55,9 @@ public class AdminController {
     public ResponseEntity<AdminDtos.TagRow> revoke(@PathVariable String uid) {
         return ResponseEntity.ok(adminService.revoke(uid));
     }
+
+    @PostMapping("/tags/{uid}/activate")
+    public ResponseEntity<AdminDtos.TagRow> activate(@PathVariable String uid) {
+        return ResponseEntity.ok(adminService.activate(uid));
+    }
 }

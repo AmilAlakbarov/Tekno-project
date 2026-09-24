@@ -92,6 +92,7 @@ GET  /api/v1/admin/scans
 GET  /api/v1/admin/security-events
 GET  /api/v1/admin/scans/locations
 POST /api/v1/admin/tags/{uid}/revoke
+POST /api/v1/admin/tags/{uid}/activate
 ```
 
 Set `FRONTEND_ORIGIN` in Render to the deployed dashboard origin. The admin

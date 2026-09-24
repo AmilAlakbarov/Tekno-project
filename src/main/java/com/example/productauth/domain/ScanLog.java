@@ -32,15 +32,28 @@ public class ScanLog {
     @Column(name = "scan_result", nullable = false, length = 32)
     private ScanResult scanResult;
 
+    @Column(name = "received_counter")
+    private Integer receivedCounter;
+
+    @Column(name = "expected_counter")
+    private Integer expectedCounter;
+
     protected ScanLog() {
     }
 
     public ScanLog(String tagUid, Double latitude, Double longitude, ScanResult scanResult) {
+        this(tagUid, latitude, longitude, scanResult, null, null);
+    }
+
+    public ScanLog(String tagUid, Double latitude, Double longitude, ScanResult scanResult,
+            Integer receivedCounter, Integer expectedCounter) {
         this.id = UUID.randomUUID();
         this.tagUid = tagUid;
         this.latitude = latitude;
         this.longitude = longitude;
         this.scanResult = scanResult;
+        this.receivedCounter = receivedCounter;
+        this.expectedCounter = expectedCounter;
     }
 
     @PrePersist
@@ -75,5 +88,13 @@ public class ScanLog {
 
     public ScanResult getScanResult() {
         return scanResult;
+    }
+
+    public Integer getReceivedCounter() {
+        return receivedCounter;
+    }
+
+    public Integer getExpectedCounter() {
+        return expectedCounter;
     }
 }

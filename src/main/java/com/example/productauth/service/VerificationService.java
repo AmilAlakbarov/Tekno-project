@@ -40,28 +40,28 @@ public class VerificationService {
         Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(uid);
 
         if (tagOptional.isEmpty()) {
-            return recordFailure(request, ScanResult.NOT_FOUND, null, "Product could not be found.");
+            return recordFailure(request, ScanResult.NOT_FOUND, null, "Product could not be found.", counter, null);
         }
 
         NfcTag tag = tagOptional.get();
         if (tag.getStatus() != TagStatus.ACTIVE) {
-            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.");
+            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
         if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(request, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.");
+            return recordFailure(request, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (hasSpeedAnomaly(request, uid)) {
-            return recordFailure(request, ScanResult.SPEED_ANOMALY, tag, "Impossible travel speed detected.");
+            return recordFailure(request, ScanResult.SPEED_ANOMALY, tag, "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (!signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac())) {
-            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.");
+            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(request, ScanResult.REAL);
+        ScanLog scanLog = saveLog(request, ScanResult.REAL, counter, counter);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
@@ -73,53 +73,77 @@ public class VerificationService {
 
         Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(normalizedUid);
         if (tagOptional.isEmpty()) {
-            return recordFailure(normalizedUid, ScanResult.NOT_FOUND, null, "Product could not be found.");
+            return recordFailure(normalizedUid, ScanResult.NOT_FOUND, null, "Product could not be found.",
+                    counterOrZero(normalizedCounter), null);
         }
 
         NfcTag tag = tagOptional.get();
         if (tag.getStatus() != TagStatus.ACTIVE) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.", counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
         }
 
         int counter;
         try {
             counter = parseCounter(normalizedCounter);
         } catch (NumberFormatException exception) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.",
+                    counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
         }
 
         if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(normalizedUid, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.");
+            return recordFailure(normalizedUid, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (!signatureVerificationService.matchesNtag424Sdm(
                 normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey())) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.");
+            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL);
+        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL, counter, counter);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
-    private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message) {
-        ScanLog scanLog = saveLog(request, result);
+    private ScanLog saveLog(VerifyRequest request, ScanResult result, Integer receivedCounter,
+            Integer expectedCounter) {
+        return saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), result,
+                receivedCounter, expectedCounter);
+    }
+
+    private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message,
+            Integer receivedCounter, Integer expectedCounter) {
+        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), result,
+                receivedCounter, expectedCounter);
         return VerifyResponse.fake(message);
     }
 
-    private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message) {
-        ScanLog scanLog = saveLog(uid, result);
+    private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message,
+            Integer receivedCounter, Integer expectedCounter) {
+        saveIfNew(uid, null, null, result, receivedCounter, expectedCounter);
         return VerifyResponse.fake(message);
     }
 
-    private ScanLog saveLog(VerifyRequest request, ScanResult result) {
-        return scanLogRepository.save(new ScanLog(
-                request.uid().toUpperCase(), request.latitude(), request.longitude(), result));
+    private ScanLog saveLog(String uid, ScanResult result, Integer receivedCounter, Integer expectedCounter) {
+        return saveIfNew(uid, null, null, result, receivedCounter, expectedCounter);
     }
 
-    private ScanLog saveLog(String uid, ScanResult result) {
-        return scanLogRepository.save(new ScanLog(uid, null, null, result));
+    private int counterOrZero(String counter) {
+        try {
+            return parseCounter(counter);
+        } catch (NumberFormatException exception) {
+            return 0;
+        }
+    }
+
+    private ScanLog saveIfNew(String uid, Double latitude, Double longitude, ScanResult result,
+            Integer receivedCounter, Integer expectedCounter) {
+        if (receivedCounter != null
+                && scanLogRepository.existsByTagUidAndReceivedCounterAndScanResult(uid, receivedCounter, result)) {
+            return null;
+        }
+        return scanLogRepository.save(new ScanLog(uid, latitude, longitude, result,
+                receivedCounter, expectedCounter));
     }
 
     private boolean hasSpeedAnomaly(VerifyRequest request, String uid) {

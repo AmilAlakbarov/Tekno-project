@@ -11,7 +11,8 @@ export const adminApi = {
   scans: () => api.get('/api/v1/admin/scans').then(({ data }) => data),
   securityEvents: () => api.get('/api/v1/admin/security-events').then(({ data }) => data),
   locations: () => api.get('/api/v1/admin/scans/locations').then(({ data }) => data),
-  revokeTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/revoke`).then(({ data }) => data)
+  revokeTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/revoke`).then(({ data }) => data),
+  activateTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/activate`).then(({ data }) => data)
 }
 
 export default api

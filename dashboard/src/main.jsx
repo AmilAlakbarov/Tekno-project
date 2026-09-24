@@ -18,6 +18,15 @@ const timeAgo = (value) => {
   if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
   return `${Math.floor(minutes / 1440)}d ago`
 }
+const uniqueScans = (rows) => {
+  const seen = new Set()
+  return rows.filter((row) => {
+    const key = `${row.uid}-${row.result}-${row.receivedCounter ?? 'none'}`
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+}
 
 function App() {
   const [page, setPage] = useState(window.location.hash.slice(1) || 'home')
@@ -79,7 +88,7 @@ function HomePage({ navigate }) {
   const load = async () => {
     try {
       const [summary, recent, points] = await Promise.all([adminApi.overview(), adminApi.scans(), adminApi.locations()])
-      setOverview(summary); setScans(recent || []); setLocations(points || []); setError('')
+      setOverview(summary); setScans(uniqueScans(recent || [])); setLocations(points || []); setError('')
     } catch { setError('Unable to reach the API. Check VITE_API_URL and that the backend is running.') }
   }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
@@ -99,7 +108,7 @@ function HomePage({ navigate }) {
         <div className="activity-chart">{[70, 40, 82, 55, 90, 52, 68].map((height, index) => <div className="bar-group" key={index}><div className="bar" style={{ height: `${height}%` }} /><span>{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</span></div>)}</div>
         <div className="chart-legend"><span><i className="legend-dot verified" /> Verified</span><span><i className="legend-dot flagged" /> Flagged</span></div>
       </section>
-      <section className="panel"><div className="panel-heading"><div><h2>Network locations</h2><span className="muted">{number(locations.length)} active coordinates</span></div></div><div className="map-placeholder"><div className="map-grid" /><span className="map-pin pin-one" /><span className="map-pin pin-two" /><span className="map-pin pin-three" /><div className="map-caption">Live scan distribution</div></div></section>
+      <section className="panel"><div className="panel-heading"><div><h2>Network locations</h2><span className="muted">{number(locations.length)} coordinates received</span></div></div><div className="map-placeholder"><div className="map-grid" />{locations.slice(0, 12).map((point, index) => <span className="map-pin" key={`${point.latitude}-${point.longitude}-${index}`} style={{ left: `${12 + ((Math.abs(point.longitude) * 7) % 76)}%`, top: `${15 + ((Math.abs(point.latitude) * 3) % 68)}%` }} />)}<div className="map-caption">{locations.length ? 'Recent API scan coordinates' : 'NFC scans do not include GPS coordinates'}</div></div></section>
     </div>
     <section className="panel"><div className="panel-heading"><div><h2>Latest scans</h2><span className="muted">The most recent activity across your tags</span></div><button className="text-button" onClick={() => navigate('security')}>All activity →</button></div>
       <ScanTable rows={scans.slice(0, 6)} />
@@ -109,7 +118,8 @@ function HomePage({ navigate }) {
 
 function ScanTable({ rows, security = false }) {
   if (!rows.length) return <div className="empty-state">No scan activity recorded yet.</div>
-  return <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th>{security && <th>LOCATION</th>}</tr></thead><tbody>{rows.map((row, index) => <tr key={`${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td>{timeAgo(row.timestamp)}</td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td>{security && <td>{row.latitude != null ? `${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}` : 'No location'}</td>}</tr>)}</tbody></table></div>
+  const visibleRows = uniqueScans(rows)
+  return <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>COUNTER</th>{security && <th>LOCATION</th>}</tr></thead><tbody>{visibleRows.map((row, index) => <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td>{timeAgo(row.timestamp)}</td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}{row.expectedCounter != null ? ` / ${row.expectedCounter}` : ''}</td>{security && <td>{row.latitude != null ? `${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}` : 'NFC location unavailable'}</td>}</tr>)}</tbody></table></div>
 }
 
 function TagsPage() {
@@ -120,8 +130,8 @@ function TagsPage() {
   const load = async () => { setLoading(true); try { const result = await adminApi.tags({ page: 0, size: 100, uid: query }); setTags(result.content || []); setError('') } catch { setError('Could not load the tag registry.') } finally { setLoading(false) } }
   useEffect(() => { load() }, [])
   useEffect(() => { const timer = setTimeout(load, 300); return () => clearTimeout(timer) }, [query])
-  const revoke = async (uid) => { if (!window.confirm(`Revoke tag ${uid}?`)) return; try { const updated = await adminApi.revokeTag(uid); setTags((items) => items.map((tag) => tag.uid === uid ? updated : tag)) } catch { setError('The tag could not be revoked.') } }
-  return <div className="stack"><div className="page-intro"><p className="muted">Manage registered NFC identities and their current state.</p><span className="refresh-label">{tags.length} tags shown</span></div>{error && <div className="error-banner">{error}</div>}<section className="panel"><div className="toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by tag UID..." /></div><button className="outline-button" onClick={load}>↻ Refresh</button></div>{loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>PRODUCT</th><th>LAST COUNTER</th><th>STATUS</th><th /></tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}><td><code>{tag.uid}</code></td><td>{tag.productName || 'Unassigned'}</td><td>{number(tag.lastScanCounter)}</td><td><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td><td className="actions">{String(tag.status).toLowerCase() !== 'revoked' && <button className="danger-button" onClick={() => revoke(tag.uid)}>Revoke</button>}</td></tr>)}</tbody></table></div>}</section></div>
+  const changeStatus = async (uid, status) => { if (!window.confirm(`${status === 'REVOKED' ? 'Revoke' : 'Activate'} tag ${uid}?`)) return; try { const updated = status === 'REVOKED' ? await adminApi.revokeTag(uid) : await adminApi.activateTag(uid); setTags((items) => items.map((tag) => tag.uid === uid ? updated : tag)) } catch { setError('The tag status could not be updated.') } }
+  return <div className="stack"><div className="page-intro"><p className="muted">Manage registered NFC identities and their current state.</p><span className="refresh-label">{tags.length} tags shown</span></div>{error && <div className="error-banner">{error}</div>}<section className="panel"><div className="toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by tag UID..." /></div><button className="outline-button" onClick={load}>↻ Refresh</button></div>{loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>PRODUCT</th><th>LAST COUNTER</th><th>STATUS</th><th /></tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}><td><code>{tag.uid}</code></td><td>{tag.productName || 'Unassigned'}</td><td>{number(tag.lastScanCounter)}</td><td><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td><td className="actions">{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}</td></tr>)}</tbody></table></div>}</section></div>
 }
 
 function SecurityPage() {
@@ -130,7 +140,7 @@ function SecurityPage() {
   const load = async () => { try { setEvents(await adminApi.securityEvents() || []); setError('') } catch { setError('Could not load security events.') } }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
   const flagged = useMemo(() => events.filter((event) => !['REAL', 'VALID', 'SUCCESS'].includes(String(event.result).toUpperCase())), [events])
-  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><span className="refresh-label">Auto-refreshes every 15s</span></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{flagged.length} flagged events</strong><span>Requires review</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={events} security /></section></div>
+  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><span className="refresh-label">Auto-refreshes every 15s</span></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{uniqueScans(events).length} flagged events</strong><span>Unique UID/counter events</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={uniqueScans(events)} security /></section></div>
 }
 
 createRoot(document.getElementById('root')).render(<App />)
