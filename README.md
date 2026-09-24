@@ -64,6 +64,33 @@ The service:
 An active tag with a valid, newer counter shows **REAL**. Unknown, revoked,
 tampered, invalid, or replayed scans show **FAKE**.
 
+## Fraud and anomaly detection
+
+The verifier records several fraud signals in Security events:
+
+- **Replay attack**: the received counter is not greater than the last
+  accepted counter for that UID.
+- **Speed anomaly**: two scans with coordinates imply travel faster than the
+  configured limit, currently `1000 km/h`.
+- **Tampered signature**: the UID, counter, URL data, or CMAC does not
+  validate.
+- **Unknown or revoked tag**: the UID is not registered or has been disabled.
+- **Counter jump**: a valid signature advances the counter by more than 1,000,
+  which can indicate a copied tag or an unusual reader workflow.
+
+An anomaly is logged and does not advance the trusted counter. The public NFC
+browser URL cannot provide trusted GPS coordinates by itself. Reliable
+location rules require a controlled scanner/mobile app that sends authenticated
+location data or a server-side scanner location. Client-supplied coordinates
+alone must not be treated as proof of physical location.
+
+Each verification also stores the source IP address. The dashboard shows it
+for security events. An IP address gives an approximate network location, not
+the person's exact physical location. To turn IPs into countries/cities, use
+a privacy-reviewed GeoIP database such as MaxMind GeoLite2 on the backend;
+do not call an external geolocation service for every scan. Behind Render,
+the backend reads the trusted `X-Forwarded-For` value.
+
 ## Demonstration tags
 
 Migration `V5__reset_demo_tags.sql` creates the five-tag demonstration set:

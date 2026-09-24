@@ -60,8 +60,15 @@ public class NfcScanController {
                 ? request.getRequestURL().toString()
                 : publicBaseUrl + request.getRequestURI();
         String macInput = requestBaseUrl + "?" + query.substring(0, cmacIndex + 5);
-        VerifyResponse result = verificationService.verifySdm(uid, counter, cmac, macInput);
+        VerifyResponse result = verificationService.verifySdm(uid, counter, cmac, macInput, clientIp(request));
         return page(result.status(), result.message(), uid, counter, cmac, result.product());
+    }
+
+    private String clientIp(HttpServletRequest request) {
+        String forwarded = request.getHeader("X-Forwarded-For");
+        return forwarded == null || forwarded.isBlank()
+                ? request.getRemoteAddr()
+                : forwarded.split(",")[0].trim();
     }
 
     private ResponseEntity<String> page(String status, String message, String uid, String counter,

@@ -21,6 +21,7 @@ public class VerificationService {
 
     private static final double EARTH_RADIUS_KM = 6371.0088;
     private static final double MAX_SPEED_KMH = 1000.0;
+    private static final int MAX_COUNTER_JUMP = 1000;
 
     private final NfcTagRepository nfcTagRepository;
     private final ScanLogRepository scanLogRepository;
@@ -37,63 +38,80 @@ public class VerificationService {
 
     @Transactional
     public VerifyResponse verify(VerifyRequest request) {
+        return verify(request, null);
+    }
+
+    @Transactional
+    public VerifyResponse verify(VerifyRequest request, String ipAddress) {
         String uid = request.uid().toUpperCase();
         int counter = parseCounter(request.ctr());
         Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(uid);
 
         if (tagOptional.isEmpty()) {
-            return recordFailure(request, ScanResult.NOT_FOUND, null, "Product could not be found.", counter, null);
+            return recordFailure(request, ipAddress, ScanResult.NOT_FOUND, null, "Product could not be found.", counter, null);
         }
 
         NfcTag tag = tagOptional.get();
         if (tag.getStatus() != TagStatus.ACTIVE) {
-            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
         if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(request, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(request, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (hasSpeedAnomaly(request, uid)) {
-            return recordFailure(request, ScanResult.SPEED_ANOMALY, tag, "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(request, ipAddress, ScanResult.SPEED_ANOMALY, tag, "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (!signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac())) {
-            return recordFailure(request, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(request, ScanResult.REAL, counter, counter + 1);
+        ScanLog scanLog = saveLog(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress,
+                ScanResult.REAL, counter, counter + 1);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
     @Transactional
     public VerifyResponse verifySdm(String uid, String counterHex, String incomingCmac, String macInput) {
+        return verifySdm(uid, counterHex, incomingCmac, macInput, null);
+    }
+
+    @Transactional
+    public VerifyResponse verifySdm(String uid, String counterHex, String incomingCmac, String macInput,
+            String ipAddress) {
         String normalizedUid = uid.toUpperCase(Locale.ROOT);
         String normalizedCounter = counterHex.toUpperCase(Locale.ROOT);
         String normalizedCmac = incomingCmac.toUpperCase(Locale.ROOT);
 
         Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(normalizedUid);
         if (tagOptional.isEmpty()) {
-            return recordFailure(normalizedUid, ScanResult.NOT_FOUND, null, "Product could not be found.",
+            return recordFailure(normalizedUid, ipAddress, ScanResult.NOT_FOUND, null, "Product could not be found.",
                     counterOrZero(normalizedCounter), null);
         }
 
         NfcTag tag = tagOptional.get();
         if (tag.getStatus() != TagStatus.ACTIVE) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.", counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
+            return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
         }
 
         int counter;
         try {
             counter = parseCounter(normalizedCounter);
         } catch (NumberFormatException exception) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.",
+            return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.",
                     counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
         }
 
         if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(normalizedUid, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(normalizedUid, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
+        }
+
+        if (counter - tag.getLastScanCounter() > MAX_COUNTER_JUMP) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+                    "Suspicious counter jump detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         boolean signatureValid = hsmClient.isConfigured()
@@ -101,12 +119,13 @@ public class VerificationService {
                 : signatureVerificationService.matchesNtag424Sdm(
                         normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey());
         if (!signatureValid) {
-            return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
+            return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL, counter, counter + 1);
+        ScanLog scanLog = saveLog(normalizedUid, null, null, ipAddress,
+                ScanResult.REAL, counter, counter + 1);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
@@ -118,19 +137,33 @@ public class VerificationService {
 
     private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message,
             Integer receivedCounter, Integer expectedCounter) {
-        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), result,
+        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), null, result,
+                receivedCounter, expectedCounter);
+        return VerifyResponse.fake(message);
+    }
+
+    private VerifyResponse recordFailure(VerifyRequest request, String ipAddress, ScanResult result, NfcTag tag,
+            String message, Integer receivedCounter, Integer expectedCounter) {
+        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress, result,
                 receivedCounter, expectedCounter);
         return VerifyResponse.fake(message);
     }
 
     private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message,
             Integer receivedCounter, Integer expectedCounter) {
-        saveIfNew(uid, null, null, result, receivedCounter, expectedCounter);
+        saveIfNew(uid, null, null, null, result, receivedCounter, expectedCounter);
         return VerifyResponse.fake(message);
     }
 
-    private ScanLog saveLog(String uid, ScanResult result, Integer receivedCounter, Integer expectedCounter) {
-        return saveIfNew(uid, null, null, result, receivedCounter, expectedCounter);
+    private VerifyResponse recordFailure(String uid, String ipAddress, ScanResult result, NfcTag tag,
+            String message, Integer receivedCounter, Integer expectedCounter) {
+        saveIfNew(uid, null, null, ipAddress, result, receivedCounter, expectedCounter);
+        return VerifyResponse.fake(message);
+    }
+
+    private ScanLog saveLog(String uid, Double latitude, Double longitude, String ipAddress,
+            ScanResult result, Integer receivedCounter, Integer expectedCounter) {
+        return saveIfNew(uid, latitude, longitude, ipAddress, result, receivedCounter, expectedCounter);
     }
 
     private int counterOrZero(String counter) {
@@ -143,11 +176,16 @@ public class VerificationService {
 
     private ScanLog saveIfNew(String uid, Double latitude, Double longitude, ScanResult result,
             Integer receivedCounter, Integer expectedCounter) {
+        return saveIfNew(uid, latitude, longitude, null, result, receivedCounter, expectedCounter);
+    }
+
+    private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
+            ScanResult result, Integer receivedCounter, Integer expectedCounter) {
         if (receivedCounter != null
                 && scanLogRepository.existsByTagUidAndReceivedCounterAndScanResult(uid, receivedCounter, result)) {
             return null;
         }
-        return scanLogRepository.save(new ScanLog(uid, latitude, longitude, result,
+        return scanLogRepository.save(new ScanLog(uid, latitude, longitude, ipAddress, result,
                 receivedCounter, expectedCounter));
     }
 

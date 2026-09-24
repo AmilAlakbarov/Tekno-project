@@ -28,6 +28,9 @@ public class ScanLog {
 
     private Double longitude;
 
+    @Column(name = "ip_address", length = 45)
+    private String ipAddress;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "scan_result", nullable = false, length = 32)
     private ScanResult scanResult;
@@ -47,10 +50,16 @@ public class ScanLog {
 
     public ScanLog(String tagUid, Double latitude, Double longitude, ScanResult scanResult,
             Integer receivedCounter, Integer expectedCounter) {
+        this(tagUid, latitude, longitude, null, scanResult, receivedCounter, expectedCounter);
+    }
+
+    public ScanLog(String tagUid, Double latitude, Double longitude, String ipAddress,
+            ScanResult scanResult, Integer receivedCounter, Integer expectedCounter) {
         this.id = UUID.randomUUID();
         this.tagUid = tagUid;
         this.latitude = latitude;
         this.longitude = longitude;
+        this.ipAddress = ipAddress;
         this.scanResult = scanResult;
         this.receivedCounter = receivedCounter;
         this.expectedCounter = expectedCounter;
@@ -84,6 +93,10 @@ public class ScanLog {
 
     public Double getLongitude() {
         return longitude;
+    }
+
+    public String getIpAddress() {
+        return ipAddress;
     }
 
     public ScanResult getScanResult() {
