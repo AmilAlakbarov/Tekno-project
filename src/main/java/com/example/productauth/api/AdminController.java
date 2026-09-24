@@ -9,15 +9,21 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.Size;
+import org.springframework.web.multipart.MultipartFile;
+import com.example.productauth.service.ProvisioningService;
 
 @RestController
 @RequestMapping("/api/v1/admin")
 public class AdminController {
 
     private final AdminService adminService;
+    private final ProvisioningService provisioningService;
 
-    public AdminController(AdminService adminService) {
+    public AdminController(AdminService adminService, ProvisioningService provisioningService) {
         this.adminService = adminService;
+        this.provisioningService = provisioningService;
     }
 
     @GetMapping("/overview")
@@ -59,5 +65,39 @@ public class AdminController {
     @PostMapping("/tags/{uid}/activate")
     public ResponseEntity<AdminDtos.TagRow> activate(@PathVariable String uid) {
         return ResponseEntity.ok(adminService.activate(uid));
+    }
+
+    @GetMapping("/products")
+    public List<AdminDtos.ProductRow> products() {
+        return provisioningService.products();
+    }
+
+    @PostMapping("/products")
+    public ResponseEntity<AdminDtos.ProductRow> createProduct(@Valid @RequestBody ProductRequest request) {
+        return ResponseEntity.ok(provisioningService.createProduct(request.name(), request.manufacturer()));
+    }
+
+    @PostMapping(value = "/provisioning/import", consumes = "multipart/form-data")
+    public AdminDtos.ProvisioningResult importProvisioning(
+            @RequestPart("file") MultipartFile file,
+            @RequestHeader(value = "X-Admin-Actor", defaultValue = "local-admin") String actor) {
+        return provisioningService.importCsv(file, actor);
+    }
+
+    @PutMapping("/tags/{uid}/metadata")
+    public ResponseEntity<AdminDtos.TagRow> updateMetadata(@PathVariable String uid,
+            @Valid @RequestBody MetadataRequest request) {
+        return ResponseEntity.ok(adminService.updateMetadata(uid, request));
+    }
+
+    public record MetadataRequest(
+            @Size(max = 255) String displayName,
+            @Size(max = 2000) String description,
+            @Size(max = 1000) String imageUrl) {
+    }
+
+    public record ProductRequest(
+            @Size(min = 1, max = 255) String name,
+            @Size(min = 1, max = 255) String manufacturer) {
     }
 }

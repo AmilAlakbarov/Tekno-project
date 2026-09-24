@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Locale;
+import com.example.productauth.api.AdminController.MetadataRequest;
 
 @Service
 public class AdminService {
@@ -85,5 +86,20 @@ public class AdminService {
                 .orElseThrow(() -> new EntityNotFoundException("Tag was not found: " + normalizedUid));
         tag.setStatus(TagStatus.ACTIVE);
         return AdminDtos.TagRow.from(nfcTagRepository.save(tag));
+    }
+
+    @Transactional
+    public AdminDtos.TagRow updateMetadata(String uid, MetadataRequest request) {
+        String normalizedUid = uid.toUpperCase(Locale.ROOT);
+        var tag = nfcTagRepository.findByTagUid(normalizedUid)
+                .orElseThrow(() -> new EntityNotFoundException("Tag was not found: " + normalizedUid));
+        tag.setDisplayName(blankToNull(request.displayName()));
+        tag.setDescription(blankToNull(request.description()));
+        tag.setImageUrl(blankToNull(request.imageUrl()));
+        return AdminDtos.TagRow.from(nfcTagRepository.save(tag));
+    }
+
+    private String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value.trim();
     }
 }

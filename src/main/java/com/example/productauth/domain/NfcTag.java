@@ -36,6 +36,19 @@ public class NfcTag {
     @Column(nullable = false, length = 16)
     private TagStatus status = TagStatus.ACTIVE;
 
+    @Column(name = "display_name")
+    private String displayName;
+
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(name = "image_url", length = 1000)
+    private String imageUrl;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "provisioning_batch_id")
+    private ProvisioningBatch provisioningBatch;
+
     protected NfcTag() {
     }
 
@@ -92,5 +105,37 @@ public class NfcTag {
 
     public void setStatus(TagStatus status) {
         this.status = status;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
+    }
+
+    public String getDescription() {
+        return description;
+    }
+
+    public void setDescription(String description) {
+        this.description = description;
+    }
+
+    public String getImageUrl() {
+        return imageUrl;
+    }
+
+    public void setImageUrl(String imageUrl) {
+        this.imageUrl = imageUrl;
+    }
+
+    public ProvisioningBatch getProvisioningBatch() {
+        return provisioningBatch;
+    }
+
+    public void setProvisioningBatch(ProvisioningBatch provisioningBatch) {
+        this.provisioningBatch = provisioningBatch;
     }
 }

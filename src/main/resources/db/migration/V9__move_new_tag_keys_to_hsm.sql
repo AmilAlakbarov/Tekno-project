@@ -1,0 +1,2 @@
+ALTER TABLE nfc_tags
+    ALTER COLUMN aes_key DROP NOT NULL;

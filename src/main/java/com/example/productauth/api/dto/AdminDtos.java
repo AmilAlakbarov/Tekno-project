@@ -7,6 +7,7 @@ import com.example.productauth.domain.TagStatus;
 
 import java.time.Instant;
 import java.util.UUID;
+import com.example.productauth.domain.ProvisioningBatch;
 
 public final class AdminDtos {
     private AdminDtos() {
@@ -16,10 +17,11 @@ public final class AdminDtos {
                            long successfulScansLast24Hours, double successRate) {
     }
 
-    public record TagRow(String uid, UUID productId, String productName, int lastScanCounter,
-                         TagStatus status) {
+    public record TagRow(String uid, UUID productId, String productName, String displayName,
+                         String description, String imageUrl, int lastScanCounter, TagStatus status) {
         public static TagRow from(NfcTag tag) {
             return new TagRow(tag.getTagUid(), tag.getProduct().getId(), tag.getProduct().getName(),
+                    tag.getDisplayName(), tag.getDescription(), tag.getImageUrl(),
                     tag.getLastScanCounter(), tag.getStatus());
         }
     }
@@ -35,5 +37,16 @@ public final class AdminDtos {
     }
 
     public record LocationPoint(double latitude, double longitude) {
+    }
+
+    public record ProductRow(UUID id, String name, String manufacturer) {
+    }
+
+    public record ProvisioningResult(UUID batchId, int totalRows, int importedRows,
+            int duplicateRows, int invalidRows, String status) {
+        public static ProvisioningResult from(ProvisioningBatch batch) {
+            return new ProvisioningResult(batch.getId(), batch.getTotalRows(), batch.getImportedRows(),
+                    batch.getDuplicateRows(), batch.getInvalidRows(), batch.getStatus());
+        }
     }
 }

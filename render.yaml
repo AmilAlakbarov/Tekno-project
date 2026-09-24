@@ -10,6 +10,10 @@ services:
         value: https://admin.authentichain.website
       - key: FRONTEND_ORIGINS
         value: https://admin.authentichain.website,https://authentichain-dashboard.onrender.com
+      - key: HSM_BASE_URL
+        value: https://authentichain-hsm.onrender.com
+      - key: HSM_SERVICE_TOKEN
+        sync: false
       - key: DB_HOST
         fromDatabase:
           name: product-auth-db
@@ -39,6 +43,22 @@ services:
     envVars:
       - key: VITE_API_URL
         value: https://authentichain.website
+  - type: web
+    name: authentichain-hsm
+    runtime: python
+    plan: free
+    rootDir: tools/hsm-service
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: HSM_SERVICE_TOKEN
+        sync: false
+      - key: HSM_DATABASE_PATH
+        value: /data/hsm.sqlite3
+    disk:
+      name: hsm-data
+      mountPath: /data
+      sizeGB: 1
 
 databases:
   - name: product-auth-db

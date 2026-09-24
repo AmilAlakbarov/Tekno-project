@@ -25,12 +25,14 @@ public class VerificationService {
     private final NfcTagRepository nfcTagRepository;
     private final ScanLogRepository scanLogRepository;
     private final SignatureVerificationService signatureVerificationService;
+    private final HsmClient hsmClient;
     public VerificationService(NfcTagRepository nfcTagRepository,
             ScanLogRepository scanLogRepository,
-            SignatureVerificationService signatureVerificationService) {
+            SignatureVerificationService signatureVerificationService, HsmClient hsmClient) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
         this.signatureVerificationService = signatureVerificationService;
+        this.hsmClient = hsmClient;
     }
 
     @Transactional
@@ -94,8 +96,11 @@ public class VerificationService {
             return recordFailure(normalizedUid, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
-        if (!signatureVerificationService.matchesNtag424Sdm(
-                normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey())) {
+        boolean signatureValid = hsmClient.isConfigured()
+                ? hsmClient.verifyNtag424(normalizedUid, normalizedCounter, macInput, normalizedCmac)
+                : signatureVerificationService.matchesNtag424Sdm(
+                        normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey());
+        if (!signatureValid) {
             return recordFailure(normalizedUid, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 

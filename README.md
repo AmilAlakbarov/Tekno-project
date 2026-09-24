@@ -91,9 +91,21 @@ GET  /api/v1/admin/tags?page=0&size=25&uid=
 GET  /api/v1/admin/scans
 GET  /api/v1/admin/security-events
 GET  /api/v1/admin/scans/locations
+GET  /api/v1/admin/products
+POST /api/v1/admin/products
+POST /api/v1/admin/provisioning/import
 POST /api/v1/admin/tags/{uid}/revoke
 POST /api/v1/admin/tags/{uid}/activate
 ```
+
+## Development provisioning simulator
+
+Until a real HSM and NFC reader/writer are available, the repository includes
+a separate software-only simulator in `tools/simulator`. It generates custom
+UIDs, AES-128 test keys, provisioning manifests, and NTAG 424 SDM-style URLs.
+It is suitable for demonstrating provisioning and dashboard flows only; it is
+not a production HSM and must not protect real product keys. See
+`tools/simulator/README.md`.
 
 Set `FRONTEND_ORIGIN` in Render to the deployed dashboard origin. The admin
 routes are currently intended for a private/internal dashboard and must be
@@ -115,6 +127,14 @@ npm run dev
 deployed Spring Boot origin when hosting the dashboard separately. The dashboard
 includes Overview, Tag registry, and Security events views and refreshes live data
 every 15 seconds.
+
+The Provisioning view can create products and import the CSV exported by the
+desktop virtual-tag simulator. The backend validates each UID, AES-128 key,
+and product ID before registering the tag. When `HSM_BASE_URL` and
+`HSM_SERVICE_TOKEN` are configured, each imported key is also stored in the
+separate HSM service and new imported tags omit the plaintext key from
+PostgreSQL. Use the same secret value for `HSM_SERVICE_TOKEN` on both Render
+services.
 
 The Render Blueprint also defines a static site named `authentichain-dashboard`.
 After deployment, optionally attach `admin.authentichain.website` to that
@@ -158,6 +178,10 @@ Keep all migrations in `src/main/resources/db/migration`:
 | `V3__insert_six_demo_products.sql` | Historical prototype demo data migration. |
 | `V4__insert_project_tags.sql` | Historical NTAG project data migration. |
 | `V5__reset_demo_tags.sql` | Current five-tag demonstration state and replay setup. |
+| `V6__add_scan_counter_details.sql` | Stores received and expected scan counters. |
+| `V7__add_tag_metadata.sql` | Adds optional tag display metadata. |
+| `V8__add_provisioning_batches.sql` | Adds provisioning batch tracking. |
+| `V9__move_new_tag_keys_to_hsm.sql` | Allows HSM-backed tags to omit plaintext keys from PostgreSQL. |
 
 Do not delete or rename an applied migration. Flyway stores each applied
 version in the database, and removing an old file can make deployment fail
