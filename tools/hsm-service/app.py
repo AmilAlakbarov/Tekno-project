@@ -103,16 +103,36 @@ class HsmHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:
-        if self.path != "/healthz":
+        if self.path == "/healthz":
+            try:
+                with _database() as connection:
+                    connection.execute("SELECT 1").fetchone()
+                _json_response(self, HTTPStatus.OK, {"status": "ok", "database": "ok"})
+            except psycopg.Error:
+                _json_response(self, HTTPStatus.SERVICE_UNAVAILABLE,
+                               {"status": "degraded", "database": "unavailable"})
+            return
+        if self.path != "/v1/keys":
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
+            return
+        if not self._authenticated():
+            _json_response(self, HTTPStatus.UNAUTHORIZED, {"error": "unauthorized"})
             return
         try:
             with _database() as connection:
-                connection.execute("SELECT 1").fetchone()
-            _json_response(self, HTTPStatus.OK, {"status": "ok", "database": "ok"})
+                rows = connection.execute(
+                    "SELECT uid, created_at FROM keys ORDER BY created_at DESC"
+                ).fetchall()
+            _json_response(self, HTTPStatus.OK, {
+                "count": len(rows),
+                "keys": [
+                    {"uid": row[0], "status": "stored", "createdAt": row[1].isoformat()}
+                    for row in rows
+                ],
+            })
         except psycopg.Error:
             _json_response(self, HTTPStatus.SERVICE_UNAVAILABLE,
-                           {"status": "degraded", "database": "unavailable"})
+                           {"error": "storage_unavailable"})
 
     def do_POST(self) -> None:
         if self.path not in {"/v1/keys/import", "/v1/cmac/verify", "/v1/ntag424/verify"}:

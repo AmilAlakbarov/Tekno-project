@@ -57,6 +57,20 @@ Unauthenticated liveness check. Returns `200`:
 If PostgreSQL is unavailable, this endpoint returns HTTP `503` with
 `{"status":"degraded","database":"unavailable"}`. A `200` health response
 therefore confirms both the HTTP process and database connection.
+
+### `GET /v1/keys`
+
+Authenticated inventory check. It returns UIDs and storage timestamps only;
+AES keys are never returned:
+
+```json
+{
+  "count": 1,
+  "keys": [
+    {"uid": "04A1B2C3D4E5F6", "status": "stored", "createdAt": "..."}
+  ]
+}
+```
 ```
 
 ### `POST /v1/keys/import`
