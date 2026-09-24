@@ -6,3 +6,5 @@ target
 *.log
 Tekno_Uno
 Tekno_NANO
+dashboard/node_modules
+dashboard/dist

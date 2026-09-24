@@ -25,16 +25,12 @@ public class VerificationService {
     private final NfcTagRepository nfcTagRepository;
     private final ScanLogRepository scanLogRepository;
     private final SignatureVerificationService signatureVerificationService;
-    private final FirebaseScanPublisher firebaseScanPublisher;
-
     public VerificationService(NfcTagRepository nfcTagRepository,
             ScanLogRepository scanLogRepository,
-            SignatureVerificationService signatureVerificationService,
-            FirebaseScanPublisher firebaseScanPublisher) {
+            SignatureVerificationService signatureVerificationService) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
         this.signatureVerificationService = signatureVerificationService;
-        this.firebaseScanPublisher = firebaseScanPublisher;
     }
 
     @Transactional
@@ -66,7 +62,6 @@ public class VerificationService {
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
         ScanLog scanLog = saveLog(request, ScanResult.REAL);
-        firebaseScanPublisher.publish(scanLog, tag.getProduct().getId().toString());
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
@@ -105,19 +100,16 @@ public class VerificationService {
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
         ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL);
-        firebaseScanPublisher.publish(scanLog, tag.getProduct().getId().toString());
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
     private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message) {
         ScanLog scanLog = saveLog(request, result);
-        firebaseScanPublisher.publish(scanLog, tag == null ? null : tag.getProduct().getId().toString());
         return VerifyResponse.fake(message);
     }
 
     private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message) {
         ScanLog scanLog = saveLog(uid, result);
-        firebaseScanPublisher.publish(scanLog, tag == null ? null : tag.getProduct().getId().toString());
         return VerifyResponse.fake(message);
     }
 

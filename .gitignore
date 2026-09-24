@@ -1,7 +1,8 @@
 .idea/
 .vscode/
 target/
+dashboard/node_modules/
+dashboard/dist/
 *.iml
 .env
 service-account*.json
-firebase-service-account*.json

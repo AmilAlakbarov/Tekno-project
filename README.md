@@ -12,7 +12,7 @@ verification page when a tag URL is opened.
 - JPA/Hibernate
 - Bouncy Castle AES-CMAC
 - Docker and Render deployment
-- Optional Firebase scan publishing
+- Render-hosted PostgreSQL admin dashboard integration
 
 ## Run locally
 
@@ -80,6 +80,46 @@ The replay demonstration starts with a high stored counter, so its normal
 captured counter is rejected. The current all-zero AES key is for development
 only. Use unique private keys before production.
 
+## Admin dashboard API
+
+The Render-native admin dashboard reads PostgreSQL through these Spring Boot
+endpoints; it does not use Firebase:
+
+```text
+GET  /api/v1/admin/overview
+GET  /api/v1/admin/tags?page=0&size=25&uid=
+GET  /api/v1/admin/scans
+GET  /api/v1/admin/security-events
+GET  /api/v1/admin/scans/locations
+POST /api/v1/admin/tags/{uid}/revoke
+```
+
+Set `FRONTEND_ORIGIN` in Render to the deployed dashboard origin. The admin
+routes are currently intended for a private/internal dashboard and must be
+protected with authentication before public production use.
+
+## React admin dashboard
+
+The Vite dashboard lives in `dashboard/` and consumes the admin API above with
+Axios polling (there is no Firebase dependency). Run it locally with:
+
+```powershell
+cd dashboard
+npm install
+$env:VITE_API_URL="http://localhost:8080"
+npm run dev
+```
+
+`VITE_API_URL` is optional and defaults to `http://localhost:8080`. Set it to the
+deployed Spring Boot origin when hosting the dashboard separately. The dashboard
+includes Overview, Tag registry, and Security events views and refreshes live data
+every 15 seconds.
+
+The Render Blueprint also defines a static site named `authentichain-dashboard`.
+After deployment, optionally attach `admin.authentichain.website` to that
+static site. Set the backend `FRONTEND_ORIGIN` value to the dashboard's actual
+origin before using the admin routes from a browser.
+
 ## API
 
 The original JSON API remains available for computer gateways:
@@ -140,12 +180,11 @@ hostname, reconfigure the tag's SDM/SUN URL so the tag generates a new CMAC.
 Do not reuse a CMAC generated for the old hostname.
 
 Render supplies database connection variables through the managed PostgreSQL
-instance. Firebase is disabled by default. Never commit database passwords,
-Firebase credentials, or production AES keys.
+instance. Never commit database passwords or production AES keys.
 
 ## Project structure
 
-- `src/main/java` - API, verification, persistence, and Firebase integration
+- `src/main/java` - API, verification, and persistence
 - `src/main/resources/db/migration` - immutable Flyway schema and data migrations
 - `src/test/java` - service tests
 Run tests with:

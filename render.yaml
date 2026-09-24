@@ -6,6 +6,8 @@ services:
     envVars:
       - key: PUBLIC_BASE_URL
         value: https://authentichain.website
+      - key: FRONTEND_ORIGIN
+        value: https://admin.authentichain.website
       - key: DB_HOST
         fromDatabase:
           name: product-auth-db
@@ -26,8 +28,15 @@ services:
         fromDatabase:
           name: product-auth-db
           property: password
-      - key: FIREBASE_ENABLED
-        value: "false"
+  - type: web
+    name: authentichain-dashboard
+    runtime: static
+    rootDir: dashboard
+    buildCommand: npm install && npm run build
+    staticPublishPath: dist
+    envVars:
+      - key: VITE_API_URL
+        value: https://authentichain.website
 
 databases:
   - name: product-auth-db
