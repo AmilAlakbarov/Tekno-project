@@ -91,7 +91,7 @@ public class ProvisioningService {
                     invalid++;
                     continue;
                 }
-                if (!fileUids.add(uid) || nfcTagRepository.findByTagUid(uid).isPresent()) {
+                if (!fileUids.add(uid) || nfcTagRepository.existsByTagUid(uid)) {
                     duplicates++;
                     continue;
                 }
@@ -104,7 +104,7 @@ public class ProvisioningService {
                 if (columns.length > 4) tag.setDescription(blankToNull(columns[4]));
                 if (columns.length > 5) tag.setImageUrl(blankToNull(columns[5]));
                 tag.setProvisioningBatch(batch);
-                nfcTagRepository.save(tag);
+                nfcTagRepository.saveAndFlush(tag);
                 imported++;
             }
         } catch (IOException exception) {

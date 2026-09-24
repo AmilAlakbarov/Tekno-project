@@ -120,7 +120,7 @@ function HomePage({ navigate }) {
 function ScanTable({ rows, security = false }) {
   if (!rows.length) return <div className="empty-state">No scan activity recorded yet.</div>
   const visibleRows = uniqueScans(rows)
-  return <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR</th><th>EXPECTED CTR</th>{security && <th>LOCATION</th>}</tr></thead><tbody>{visibleRows.map((row, index) => <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td>{timeAgo(row.timestamp)}</td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}</td><td>{row.expectedCounter ?? '—'}</td>{security && <td>{row.latitude != null ? `${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}` : 'NFC location unavailable'}</td>}</tr>)}</tbody></table></div>
+  return <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR</th><th>NEXT ACCEPTED CTR</th>{security && <th>LOCATION</th>}</tr></thead><tbody>{visibleRows.map((row, index) => <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td>{timeAgo(row.timestamp)}</td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}</td><td>{row.expectedCounter ?? '—'}</td>{security && <td>{row.latitude != null ? `${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}` : 'NFC location unavailable'}</td>}</tr>)}</tbody></table></div>
 }
 
 function TagsPage() {

@@ -15,6 +15,8 @@ public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     Optional<NfcTag> findByTagUid(String tagUid);
 
+    boolean existsByTagUid(String tagUid);
+
     Page<NfcTag> findByTagUidContainingIgnoreCase(String tagUid, Pageable pageable);
 
     long countByStatus(com.example.productauth.domain.TagStatus status);

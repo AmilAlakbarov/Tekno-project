@@ -63,7 +63,7 @@ public class VerificationService {
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(request, ScanResult.REAL, counter, counter);
+        ScanLog scanLog = saveLog(request, ScanResult.REAL, counter, counter + 1);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
@@ -106,7 +106,7 @@ public class VerificationService {
 
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL, counter, counter);
+        ScanLog scanLog = saveLog(normalizedUid, ScanResult.REAL, counter, counter + 1);
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
