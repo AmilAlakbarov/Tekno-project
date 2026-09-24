@@ -95,8 +95,22 @@ GET  /api/v1/admin/products
 POST /api/v1/admin/products
 POST /api/v1/admin/provisioning/import
 POST /api/v1/admin/tags/{uid}/revoke
+DELETE /api/v1/admin/tags/{uid}
+DELETE /api/v1/admin/products/{productId}
 POST /api/v1/admin/tags/{uid}/activate
+GET  /api/v1/admin/accounts
+POST /api/v1/admin/accounts
+DELETE /api/v1/admin/accounts/{id}
 ```
+
+Dashboard access uses session-based accounts. Configure `ADMIN_USERNAME` and
+`ADMIN_PASSWORD` on the backend before the first deployment; the account is
+created by Flyway/application startup only when it does not already exist.
+Passwords are stored as BCrypt hashes. `ADMIN` can manage accounts,
+`OPERATOR` can manage tags and provisioning, and `VIEWER` has read-only
+dashboard access. The initial password is not changed automatically after the
+account is created, so rotate it by creating a replacement account and
+removing the bootstrap account after signing in as the replacement.
 
 ## Development provisioning simulator
 
@@ -107,9 +121,8 @@ It is suitable for demonstrating provisioning and dashboard flows only; it is
 not a production HSM and must not protect real product keys. See
 `tools/simulator/README.md`.
 
-Set `FRONTEND_ORIGIN` in Render to the deployed dashboard origin. The admin
-routes are currently intended for a private/internal dashboard and must be
-protected with authentication before public production use.
+Set `FRONTEND_ORIGINS` in Render to the deployed dashboard origin. The admin
+routes require an authenticated account session.
 
 ## React admin dashboard
 

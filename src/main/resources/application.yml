@@ -27,6 +27,9 @@ app:
   hsm:
     base-url: ${HSM_BASE_URL:}
     service-token: ${HSM_SERVICE_TOKEN:}
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    password: ${ADMIN_PASSWORD:}
 
 logging:
   level:

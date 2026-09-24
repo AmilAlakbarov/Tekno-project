@@ -135,7 +135,8 @@ class HsmHandler(BaseHTTPRequestHandler):
                            {"error": "storage_unavailable"})
 
     def do_POST(self) -> None:
-        if self.path not in {"/v1/keys/import", "/v1/cmac/verify", "/v1/ntag424/verify"}:
+        if self.path not in {"/v1/keys/import", "/v1/keys/delete",
+                             "/v1/cmac/verify", "/v1/ntag424/verify"}:
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
         if not self._authenticated():
@@ -145,6 +146,8 @@ class HsmHandler(BaseHTTPRequestHandler):
             body = self._read_json()
             if self.path == "/v1/keys/import":
                 self._import_key(body)
+            elif self.path == "/v1/keys/delete":
+                self._delete_key(body)
             elif self.path == "/v1/cmac/verify":
                 self._verify_cmac(body)
             else:
@@ -186,6 +189,18 @@ class HsmHandler(BaseHTTPRequestHandler):
                 (uid_text, aes_key),
             )
         _json_response(self, HTTPStatus.OK, {"uid": uid_text, "status": "imported"})
+
+    def _delete_key(self, body: dict[str, Any]) -> None:
+        uid = _hex_value(body.get("uid"), "uid", lengths=set(range(4, 17)))
+        uid_text = uid.hex().upper()
+        with _database() as connection:
+            deleted = connection.execute(
+                "DELETE FROM keys WHERE uid=%s", (uid_text,)
+            ).rowcount
+        _json_response(self, HTTPStatus.OK, {
+            "uid": uid_text,
+            "status": "deleted" if deleted else "not_found",
+        })
 
     def _verify_cmac(self, body: dict[str, Any]) -> None:
         uid = _hex_value(body.get("uid"), "uid", lengths=set(range(4, 17)))

@@ -1,13 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react'
 import { createRoot } from 'react-dom/client'
-import { adminApi } from './api'
+import { adminApi, authApi } from './api'
 import './styles.css'
 
 const navItems = [
   { id: 'home', label: 'Overview', icon: '⌂' },
   { id: 'tags', label: 'Tag registry', icon: '⌁' },
   { id: 'provisioning', label: 'Provisioning', icon: '+' },
-  { id: 'security', label: 'Security events', icon: '◈' }
+  { id: 'security', label: 'Security events', icon: '◈' },
+  { id: 'accounts', label: 'Accounts', icon: '◎', adminOnly: true }
 ]
 
 const number = (value) => new Intl.NumberFormat().format(value || 0)
@@ -30,6 +31,9 @@ const uniqueScans = (rows) => {
 }
 
 function App() {
+  const [user, setUser] = useState(undefined)
+  const [credentials, setCredentials] = useState({ username: '', password: '' })
+  const [loginError, setLoginError] = useState('')
   const [page, setPage] = useState(window.location.hash.slice(1) || 'home')
   const [mobileNav, setMobileNav] = useState(false)
 
@@ -38,6 +42,20 @@ function App() {
     window.addEventListener('hashchange', onHash)
     return () => window.removeEventListener('hashchange', onHash)
   }, [])
+
+  useEffect(() => { authApi.me().then(setUser).catch(() => setUser(null)) }, [])
+  const login = async (event) => {
+    event.preventDefault()
+    try { setUser(await authApi.login(credentials)); setLoginError('') }
+    catch { setLoginError('Invalid username or password') }
+  }
+  if (user === undefined) return null
+  if (!user) return <main className="main-content"><form className="panel login-panel" onSubmit={login}>
+    <h1>Admin sign in</h1><p className="muted">Sign in to access the control center.</p>
+    <label>Username<input required value={credentials.username} onChange={e => setCredentials({ ...credentials, username: e.target.value })} /></label>
+    <label>Password<input required type="password" value={credentials.password} onChange={e => setCredentials({ ...credentials, password: e.target.value })} /></label>
+    {loginError && <div className="error-banner">{loginError}</div>}<button className="primary-button" type="submit">Sign in</button>
+  </form></main>
 
   const navigate = (next) => {
     window.location.hash = next
@@ -50,7 +68,7 @@ function App() {
         <div className="brand"><span className="brand-mark">A</span><span>AUTHENTICHAIN</span></div>
         <div className="workspace-label">CONTROL CENTER</div>
         <nav>
-          {navItems.map((item) => (
+          {navItems.filter((item) => !item.adminOnly || user.role === 'ADMIN').map((item) => (
             <button className={`nav-item ${page === item.id ? 'active' : ''}`} key={item.id} onClick={() => navigate(item.id)}>
               <span className="nav-icon">{item.icon}</span>{item.label}
             </button>
@@ -66,14 +84,25 @@ function App() {
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileNav(true)} aria-label="Open navigation">☰</button>
           <div><div className="eyebrow">ADMINISTRATION</div><h1>{navItems.find((item) => item.id === page)?.label || 'Overview'}</h1></div>
-          <div className="topbar-meta"><span className="live-pill"><span className="status-dot" /> LIVE</span><span className="avatar">AC</span></div>
+          <div className="topbar-meta"><span className="live-pill"><span className="status-dot" /> LIVE</span><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><button className="text-button" onClick={() => authApi.logout().then(() => setUser(null))}>Log out</button></div>
         </header>
         <div className="page-content">
-          {page === 'tags' ? <TagsPage /> : page === 'provisioning' ? <ProvisioningPage /> : page === 'security' ? <SecurityPage /> : <HomePage navigate={navigate} />}
+          {page === 'tags' ? <TagsPage /> : page === 'provisioning' ? <ProvisioningPage /> : page === 'security' ? <SecurityPage /> : page === 'accounts' && user.role === 'ADMIN' ? <AccountsPage user={user} /> : <HomePage navigate={navigate} />}
         </div>
       </main>
     </div>
   )
+}
+
+function AccountsPage({ user }) {
+  const [accounts, setAccounts] = useState([])
+  const [form, setForm] = useState({ username: '', password: '', role: 'OPERATOR' })
+  const [error, setError] = useState('')
+  const load = async () => { try { setAccounts(await adminApi.accounts()); setError('') } catch { setError('Could not load accounts.') } }
+  useEffect(() => { load() }, [])
+  const create = async (event) => { event.preventDefault(); try { await adminApi.createAccount(form); setForm({ username: '', password: '', role: 'OPERATOR' }); await load() } catch { setError('Could not create account. Use a unique username and a password of at least 12 characters.') } }
+  const remove = async (account) => { if (!window.confirm(`Delete account "${account.username}"?`)) return; try { await adminApi.deleteAccount(account.id); await load() } catch { setError('The account could not be deleted.') } }
+  return <div className="stack"><div className="page-intro"><p className="muted">Create separate accounts and assign the least privilege needed.</p></div>{error && <div className="error-banner">{error}</div>}<div className="content-grid"><section className="panel"><div className="panel-heading"><div><h2>Create account</h2><span className="muted">Passwords are stored as BCrypt hashes.</span></div></div><form onSubmit={create} className="stack"><label>Username<input required value={form.username} onChange={(event) => setForm({ ...form, username: event.target.value })} /></label><label>Temporary password<input required minLength="12" type="password" value={form.password} onChange={(event) => setForm({ ...form, password: event.target.value })} /></label><label>Role<select value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}><option value="VIEWER">Viewer — read-only</option><option value="OPERATOR">Operator — manage tags and provisioning</option><option value="ADMIN">Admin — manage accounts and everything else</option></select></label><button className="primary-button" type="submit">Create account</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Accounts</h2><span className="muted">{accounts.length} accounts</span></div></div><div className="table-wrap"><table><thead><tr><th>USERNAME</th><th>ROLE</th><th /></tr></thead><tbody>{accounts.map((account) => <tr key={account.id}><td>{account.username}{account.username === user.username && <small className="table-subtitle">Current account</small>}</td><td><span className="badge">{account.role}</span></td><td className="actions">{account.username !== user.username && <button className="danger-button" onClick={() => remove(account)}>Delete</button>}</td></tr>)}</tbody></table></div></section></div></div>
 }
 
 function StatCard({ label, value, detail, accent }) {
@@ -133,8 +162,9 @@ function TagsPage() {
   useEffect(() => { load() }, [])
   useEffect(() => { const timer = setTimeout(load, 300); return () => clearTimeout(timer) }, [query])
   const changeStatus = async (uid, status) => { if (!window.confirm(`${status === 'REVOKED' ? 'Revoke' : 'Activate'} tag ${uid}?`)) return; try { const updated = status === 'REVOKED' ? await adminApi.revokeTag(uid) : await adminApi.activateTag(uid); setTags((items) => items.map((tag) => tag.uid === uid ? updated : tag)) } catch { setError('The tag status could not be updated.') } }
+  const removeTag = async (uid) => { if (!window.confirm(`Permanently delete tag ${uid}? Its scan history will remain, but its HSM key will be deleted.`)) return; try { await adminApi.deleteTag(uid); setTags((items) => items.filter((tag) => tag.uid !== uid)); setError('') } catch { setError('The tag could not be deleted. It may still be referenced or the HSM may be unavailable.') } }
   const saveMetadata = async (event) => { event.preventDefault(); try { const updated = await adminApi.updateTagMetadata(editing.uid, { displayName: editing.displayName, description: editing.description, imageUrl: editing.imageUrl }); setTags((items) => items.map((tag) => tag.uid === updated.uid ? updated : tag)); setEditing(null) } catch { setError('The tag metadata could not be saved.') } }
-  return <div className="stack"><div className="page-intro"><p className="muted">Manage registered NFC identities and their current state. UID and AES keys are never editable here.</p><span className="refresh-label">{tags.length} tags shown</span></div>{error && <div className="error-banner">{error}</div>}<section className="panel"><div className="toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by tag UID..." /></div><button className="outline-button" onClick={load}>↻ Refresh</button></div>{loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>PRODUCT</th><th>LAST COUNTER</th><th>STATUS</th><th /></tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}><td><code>{tag.uid}</code></td><td><strong>{tag.displayName || tag.productName || 'Unassigned'}</strong>{tag.description && <small className="table-subtitle">{tag.description}</small>}</td><td>{number(tag.lastScanCounter)}</td><td><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td><td className="actions"><button className="outline-button" onClick={() => setEditing({ ...tag })}>Edit</button>{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}</td></tr>)}</tbody></table></div>}</section>{editing && <div className="modal-backdrop"><form className="modal panel" onSubmit={saveMetadata}><div className="panel-heading"><div><h2>Edit product label</h2><span className="muted">{editing.uid}</span></div><button type="button" className="text-button" onClick={() => setEditing(null)}>Close</button></div><label>Display name<input value={editing.displayName || ''} onChange={(event) => setEditing({ ...editing, displayName: event.target.value })} placeholder="e.g. Blue bottle — batch A" /></label><label>Description<textarea value={editing.description || ''} onChange={(event) => setEditing({ ...editing, description: event.target.value })} placeholder="Short product description" /></label><label>Image URL<input type="url" value={editing.imageUrl || ''} onChange={(event) => setEditing({ ...editing, imageUrl: event.target.value })} placeholder="https://..." /></label>{editing.imageUrl && <img className="metadata-preview" src={editing.imageUrl} alt="Product preview" /> }<div className="modal-actions"><button type="button" className="outline-button" onClick={() => setEditing(null)}>Cancel</button><button className="primary-button" type="submit">Save details</button></div></form></div>}</div>
+  return <div className="stack"><div className="page-intro"><p className="muted">Manage registered NFC identities and their current state. UID and AES keys are never editable here.</p><span className="refresh-label">{tags.length} tags shown</span></div>{error && <div className="error-banner">{error}</div>}<section className="panel"><div className="toolbar"><div className="search-box"><span>⌕</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Search by tag UID..." /></div><button className="outline-button" onClick={load}>↻ Refresh</button></div>{loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>PRODUCT</th><th>LAST COUNTER</th><th>STATUS</th><th /></tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}><td><code>{tag.uid}</code></td><td><strong>{tag.displayName || tag.productName || 'Unassigned'}</strong>{tag.description && <small className="table-subtitle">{tag.description}</small>}</td><td>{number(tag.lastScanCounter)}</td><td><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td><td className="actions"><button className="outline-button" onClick={() => setEditing({ ...tag })}>Edit</button>{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}<button className="danger-button" onClick={() => removeTag(tag.uid)}>Delete</button></td></tr>)}</tbody></table></div>}</section>{editing && <div className="modal-backdrop"><form className="modal panel" onSubmit={saveMetadata}><div className="panel-heading"><div><h2>Edit product label</h2><span className="muted">{editing.uid}</span></div><button type="button" className="text-button" onClick={() => setEditing(null)}>Close</button></div><label>Display name<input value={editing.displayName || ''} onChange={(event) => setEditing({ ...editing, displayName: event.target.value })} placeholder="e.g. Blue bottle — batch A" /></label><label>Description<textarea value={editing.description || ''} onChange={(event) => setEditing({ ...editing, description: event.target.value })} placeholder="Short product description" /></label><label>Image URL<input type="url" value={editing.imageUrl || ''} onChange={(event) => setEditing({ ...editing, imageUrl: event.target.value })} placeholder="https://..." /></label>{editing.imageUrl && <img className="metadata-preview" src={editing.imageUrl} alt="Product preview" /> }<div className="modal-actions"><button type="button" className="outline-button" onClick={() => setEditing(null)}>Cancel</button><button className="primary-button" type="submit">Save details</button></div></form></div>}</div>
 }
 
 function SecurityPage() {
@@ -156,7 +186,8 @@ function ProvisioningPage() {
   useEffect(() => { loadProducts() }, [])
   const create = async (event) => { event.preventDefault(); try { await adminApi.createProduct(product); setProduct({ name: '', manufacturer: '' }); await loadProducts() } catch { setError('Could not create the product.') } }
   const importFile = async () => { if (!file) return; try { setResult(await adminApi.importProvisioning(file)); setError('') } catch { setError('The provisioning CSV could not be imported.') } }
-  return <div className="stack"><div className="page-intro"><div><p className="muted">Import virtual NTAG records created by the desktop simulator. AES keys are never displayed.</p></div></div>{error && <div className="error-banner">{error}</div>}<div className="content-grid"><section className="panel"><div className="panel-heading"><div><h2>Create product</h2><span className="muted">Name and manufacturer are required.</span></div></div><form onSubmit={create} className="stack"><label>Product name<input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></label><label>Manufacturer<input value={product.manufacturer} onChange={(event) => setProduct({ ...product, manufacturer: event.target.value })} required /></label><button className="primary-button" type="submit">Create product</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Import provisioning CSV</h2><span className="muted">Required columns: uid, aesKey, productId</span></div></div><input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /><p className="muted">{file ? file.name : 'Choose the CSV exported by the desktop virtual-tag simulator.'}</p><button className="primary-button" disabled={!file} onClick={importFile}>Validate and import</button>{result && <div className="import-result"><strong>{result.status}</strong><span>{result.importedRows} imported · {result.duplicateRows} duplicates · {result.invalidRows} invalid</span></div>}</section></div><section className="panel"><div className="panel-heading"><div><h2>Products</h2><span className="muted">Select a product ID when creating virtual tags.</span></div></div>{products.length ? <div className="table-wrap"><table><thead><tr><th>NAME</th><th>MANUFACTURER</th><th>PRODUCT ID</th></tr></thead><tbody>{products.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.manufacturer}</td><td><code>{item.id}</code></td></tr>)}</tbody></table></div> : <div className="empty-state">No products yet.</div>}</section></div>
+  const removeProduct = async (item) => { if (!window.confirm(`Permanently delete product "${item.name}"? It must have no tags.`)) return; try { await adminApi.deleteProduct(item.id); await loadProducts(); setError('') } catch { setError('The product could not be deleted. Delete all tags linked to it first.') } }
+  return <div className="stack"><div className="page-intro"><div><p className="muted">Import virtual NTAG records created by the desktop simulator. AES keys are never displayed.</p></div></div>{error && <div className="error-banner">{error}</div>}<div className="content-grid"><section className="panel"><div className="panel-heading"><div><h2>Create product</h2><span className="muted">Name and manufacturer are required.</span></div></div><form onSubmit={create} className="stack"><label>Product name<input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></label><label>Manufacturer<input value={product.manufacturer} onChange={(event) => setProduct({ ...product, manufacturer: event.target.value })} required /></label><button className="primary-button" type="submit">Create product</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Import provisioning CSV</h2><span className="muted">Required columns: uid, aesKey, productId</span></div></div><input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /><p className="muted">{file ? file.name : 'Choose the CSV exported by the desktop virtual-tag simulator.'}</p><button className="primary-button" disabled={!file} onClick={importFile}>Validate and import</button>{result && <div className="import-result"><strong>{result.status}</strong><span>{result.importedRows} imported · {result.duplicateRows} duplicates · {result.invalidRows} invalid</span></div>}</section></div><section className="panel"><div className="panel-heading"><div><h2>Products</h2><span className="muted">Select a product ID when creating virtual tags.</span></div></div>{products.length ? <div className="table-wrap"><table><thead><tr><th>NAME</th><th>MANUFACTURER</th><th>PRODUCT ID</th><th /></tr></thead><tbody>{products.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.manufacturer}</td><td><code>{item.id}</code></td><td><button className="danger-button" onClick={() => removeProduct(item)}>Delete</button></td></tr>)}</tbody></table></div> : <div className="empty-state">No products yet.</div>}</section></div>
 }
 
 createRoot(document.getElementById('root')).render(<App />)

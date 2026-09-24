@@ -32,6 +32,16 @@ public class HsmClient {
                 .retrieve().toBodilessEntity();
     }
 
+    public void deleteKey(String uid) {
+        if (!configured) {
+            return;
+        }
+        client.post().uri("/v1/keys/delete")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .body(new KeyDeleteRequest(uid))
+                .retrieve().toBodilessEntity();
+    }
+
     public boolean verifyNtag424(String uid, String counterHex, String macInput, String incomingCmac) {
         if (!configured) {
             return false;
@@ -44,6 +54,9 @@ public class HsmClient {
     }
 
     private record KeyImportRequest(String uid, String aes_key) {
+    }
+
+    private record KeyDeleteRequest(String uid) {
     }
 
     private record NtagVerifyRequest(String uid, String counter_hex, String mac_input, String incoming_cmac) {

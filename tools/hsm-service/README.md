@@ -91,6 +91,18 @@ Response `200` (no key):
 {"uid":"04A1B2C3D4E5F6","status":"imported"}
 ```
 
+### `POST /v1/keys/delete`
+
+Deletes the stored key for a UID. This endpoint is authenticated and returns
+metadata only:
+
+```json
+{"uid":"04A1B2C3D4E5F6"}
+```
+
+The response is `{"uid":"04A1B2C3D4E5F6","status":"deleted"}` or
+`"not_found"`. The backend calls this endpoint before deleting a tag record.
+
 ### `POST /v1/cmac/verify`
 
 Computes AES-CMAC using the stored key and compares it with `cmac`. Supply

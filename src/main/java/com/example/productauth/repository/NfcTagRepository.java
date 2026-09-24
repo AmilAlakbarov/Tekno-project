@@ -9,6 +9,7 @@ import org.springframework.data.jpa.repository.Lock;
 
 import java.util.Optional;
 import java.util.UUID;
+import java.util.List;
 
 public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
 
@@ -16,6 +17,10 @@ public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
     Optional<NfcTag> findByTagUid(String tagUid);
 
     boolean existsByTagUid(String tagUid);
+
+    List<NfcTag> findByProductId(UUID productId);
+
+    long countByProductId(UUID productId);
 
     Page<NfcTag> findByTagUidContainingIgnoreCase(String tagUid, Pageable pageable);
 

@@ -6,6 +6,7 @@ import com.example.productauth.domain.TagStatus;
 import com.example.productauth.domain.NfcTag;
 import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ScanLogRepository;
+import com.example.productauth.repository.ProductRepository;
 import jakarta.persistence.EntityNotFoundException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -23,10 +24,15 @@ public class AdminService {
 
     private final NfcTagRepository nfcTagRepository;
     private final ScanLogRepository scanLogRepository;
+    private final ProductRepository productRepository;
+    private final HsmClient hsmClient;
 
-    public AdminService(NfcTagRepository nfcTagRepository, ScanLogRepository scanLogRepository) {
+    public AdminService(NfcTagRepository nfcTagRepository, ScanLogRepository scanLogRepository,
+            ProductRepository productRepository, HsmClient hsmClient) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
+        this.productRepository = productRepository;
+        this.hsmClient = hsmClient;
     }
 
     @Transactional(readOnly = true)
@@ -97,6 +103,26 @@ public class AdminService {
         tag.setDescription(blankToNull(request.description()));
         tag.setImageUrl(blankToNull(request.imageUrl()));
         return AdminDtos.TagRow.from(nfcTagRepository.save(tag));
+    }
+
+    @Transactional
+    public void deleteTag(String uid) {
+        String normalizedUid = uid.toUpperCase(Locale.ROOT);
+        var tag = nfcTagRepository.findByTagUid(normalizedUid)
+                .orElseThrow(() -> new EntityNotFoundException("Tag was not found: " + normalizedUid));
+        hsmClient.deleteKey(normalizedUid);
+        nfcTagRepository.delete(tag);
+    }
+
+    @Transactional
+    public void deleteProduct(java.util.UUID productId) {
+        if (!productRepository.existsById(productId)) {
+            throw new EntityNotFoundException("Product was not found: " + productId);
+        }
+        if (nfcTagRepository.countByProductId(productId) > 0) {
+            throw new IllegalStateException("Delete or revoke the product's tags before deleting the product.");
+        }
+        productRepository.deleteById(productId);
     }
 
     private String blankToNull(String value) {

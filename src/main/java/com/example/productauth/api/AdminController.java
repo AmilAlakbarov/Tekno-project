@@ -13,6 +13,7 @@ import jakarta.validation.Valid;
 import jakarta.validation.constraints.Size;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.productauth.service.ProvisioningService;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/v1/admin")
@@ -67,6 +68,12 @@ public class AdminController {
         return ResponseEntity.ok(adminService.activate(uid));
     }
 
+    @DeleteMapping("/tags/{uid}")
+    public ResponseEntity<Void> deleteTag(@PathVariable String uid) {
+        adminService.deleteTag(uid);
+        return ResponseEntity.noContent().build();
+    }
+
     @GetMapping("/products")
     public List<AdminDtos.ProductRow> products() {
         return provisioningService.products();
@@ -75,6 +82,12 @@ public class AdminController {
     @PostMapping("/products")
     public ResponseEntity<AdminDtos.ProductRow> createProduct(@Valid @RequestBody ProductRequest request) {
         return ResponseEntity.ok(provisioningService.createProduct(request.name(), request.manufacturer()));
+    }
+
+    @DeleteMapping("/products/{productId}")
+    public ResponseEntity<Void> deleteProduct(@PathVariable UUID productId) {
+        adminService.deleteProduct(productId);
+        return ResponseEntity.noContent().build();
     }
 
     @PostMapping(value = "/provisioning/import", consumes = "multipart/form-data")
