@@ -52,7 +52,11 @@ require `Authorization: Bearer <HSM_API_TOKEN>`. Error responses are
 Unauthenticated liveness check. Returns `200`:
 
 ```json
-{"status":"ok"}
+{"status":"ok","database":"ok"}
+
+If PostgreSQL is unavailable, this endpoint returns HTTP `503` with
+`{"status":"degraded","database":"unavailable"}`. A `200` health response
+therefore confirms both the HTTP process and database connection.
 ```
 
 ### `POST /v1/keys/import`

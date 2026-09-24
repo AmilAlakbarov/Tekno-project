@@ -106,7 +106,13 @@ class HsmHandler(BaseHTTPRequestHandler):
         if self.path != "/healthz":
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
-        _json_response(self, HTTPStatus.OK, {"status": "ok"})
+        try:
+            with _database() as connection:
+                connection.execute("SELECT 1").fetchone()
+            _json_response(self, HTTPStatus.OK, {"status": "ok", "database": "ok"})
+        except psycopg.Error:
+            _json_response(self, HTTPStatus.SERVICE_UNAVAILABLE,
+                           {"status": "degraded", "database": "unavailable"})
 
     def do_POST(self) -> None:
         if self.path not in {"/v1/keys/import", "/v1/cmac/verify", "/v1/ntag424/verify"}:
