@@ -3,8 +3,9 @@
 This is a separate, development-only HTTP service for storing UID/AES records
 and performing AES-CMAC checks. It is intentionally independent of the Java
 application and dashboard. Keys are stored in SQLite and are never returned by
-the API. Use a Render persistent disk mounted at `/data` when deploying, or
-the database will be ephemeral.
+the API. Render's free tier cannot use persistent disks, so a free deployment
+has ephemeral storage and its key store can be reset on restart or redeploy.
+Do not use it for real production keys.
 
 ## Run locally
 
@@ -16,9 +17,11 @@ $env:HSM_DB_PATH="hsm.sqlite3"
 python app.py
 ```
 
-For Render, create a Docker web service with this directory as its root,
-mount a persistent disk at `/data`, and set `HSM_API_TOKEN` as a secret
-environment variable. Render supplies `PORT`; the container listens on it.
+For Render, create a Python web service with this directory as its root,
+set `HSM_SERVICE_TOKEN` as a secret environment variable, and use
+`HSM_DATABASE_PATH=/tmp/hsm.sqlite3`. Render supplies `PORT`; the container
+listens on it. Use a paid persistent disk or a managed encrypted database
+before production.
 
 ## API contract
 

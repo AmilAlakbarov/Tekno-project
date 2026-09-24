@@ -54,11 +54,7 @@ services:
       - key: HSM_SERVICE_TOKEN
         sync: false
       - key: HSM_DATABASE_PATH
-        value: /data/hsm.sqlite3
-    disk:
-      name: hsm-data
-      mountPath: /data
-      sizeGB: 1
+        value: /tmp/hsm.sqlite3
 
 databases:
   - name: product-auth-db
