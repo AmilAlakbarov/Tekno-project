@@ -50,8 +50,9 @@ function App() {
     catch { setLoginError('Invalid username or password') }
   }
   if (user === undefined) return null
-  if (!user) return <main className="main-content"><form className="panel login-panel" onSubmit={login}>
-    <h1>Admin sign in</h1><p className="muted">Sign in to access the control center.</p>
+  if (!user) return <main className="login-shell"><form className="panel login-panel" onSubmit={login}>
+    <img className="login-logo" src="/authentichain-logo.svg" alt="Authentichain" />
+    <div className="login-kicker">CONTROL CENTER</div><h1>Sign in securely</h1><p className="muted">Manage product identity, provisioning, and verification events.</p>
     <label>Username<input required value={credentials.username} onChange={e => setCredentials({ ...credentials, username: e.target.value })} /></label>
     <label>Password<input required type="password" value={credentials.password} onChange={e => setCredentials({ ...credentials, password: e.target.value })} /></label>
     {loginError && <div className="error-banner">{loginError}</div>}<button className="primary-button" type="submit">Sign in</button>
@@ -65,7 +66,7 @@ function App() {
   return (
     <div className="app-shell">
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
-        <div className="brand"><span className="brand-mark">A</span><span>AUTHENTICHAIN</span></div>
+        <div className="brand"><img src="/authentichain-mark.svg" alt="" /><span>AUTHENTI<span>CHAIN</span></span></div>
         <div className="workspace-label">CONTROL CENTER</div>
         <nav>
           {navItems.filter((item) => !item.adminOnly || user.role === 'ADMIN').map((item) => (

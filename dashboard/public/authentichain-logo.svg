@@ -1,0 +1,25 @@
+<svg width="980" height="260" viewBox="0 0 980 260" fill="none" xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc">
+  <title id="title">Authentichain</title>
+  <desc id="desc">Verified chain links representing trusted product identity.</desc>
+  <defs>
+    <linearGradient id="lime" x1="34" y1="35" x2="190" y2="190" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#8BE21B"/>
+      <stop offset="1" stop-color="#54B915"/>
+    </linearGradient>
+    <linearGradient id="word" x1="265" y1="70" x2="900" y2="150" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#064F3B"/>
+      <stop offset="1" stop-color="#6DCE19"/>
+    </linearGradient>
+  </defs>
+  <g transform="translate(75 20)">
+    <path d="M96 72 145 34c20-16 49-13 65 7 16 20 13 49-7 65l-42 33" stroke="#064F3B" stroke-width="30" stroke-linecap="round"/>
+    <path d="m91 148-43 34c-20 16-49 13-65-7-16-20-13-49 7-65l44-35" stroke="#064F3B" stroke-width="30" stroke-linecap="round"/>
+    <path d="m67 76 88 42" stroke="url(#lime)" stroke-width="24" stroke-linecap="round"/>
+    <path d="m42 144 87 42" stroke="url(#lime)" stroke-width="24" stroke-linecap="round"/>
+    <circle cx="39" cy="39" r="39" fill="url(#lime)"/>
+    <path d="m20 39 12 12 29-31" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="168" cy="181" r="39" fill="url(#lime)"/>
+    <path d="m149 181 12 12 29-31" stroke="white" stroke-width="10" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <text x="310" y="160" font-family="Manrope, Arial, sans-serif" font-size="76" font-weight="800" letter-spacing="-3" fill="url(#word)">Authenti<tspan fill="#70D019">Chain</tspan></text>
+</svg>
