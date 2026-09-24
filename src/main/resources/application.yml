@@ -23,7 +23,7 @@ server:
 
 app:
   public-base-url: ${PUBLIC_BASE_URL:}
-  frontend-origin: ${FRONTEND_ORIGIN:http://localhost:5173}
+  frontend-origins: ${FRONTEND_ORIGINS:http://localhost:5173}
 
 logging:
   level:

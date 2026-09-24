@@ -7,13 +7,11 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.bind.annotation.CrossOrigin;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/admin")
-@CrossOrigin(origins = "${app.frontend-origin:http://localhost:5173}")
 public class AdminController {
 
     private final AdminService adminService;

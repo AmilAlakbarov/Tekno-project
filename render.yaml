@@ -8,6 +8,8 @@ services:
         value: https://authentichain.website
       - key: FRONTEND_ORIGIN
         value: https://admin.authentichain.website
+      - key: FRONTEND_ORIGINS
+        value: https://admin.authentichain.website,https://authentichain-dashboard.onrender.com
       - key: DB_HOST
         fromDatabase:
           name: product-auth-db
