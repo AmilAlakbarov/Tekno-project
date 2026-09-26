@@ -1,5 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { createRoot } from 'react-dom/client'
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from 'react-leaflet'
+import 'leaflet/dist/leaflet.css'
 import { adminApi, authApi } from './api'
 import './styles.css'
 
@@ -20,6 +22,9 @@ const timeAgo = (value) => {
   if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`
   return `${Math.floor(minutes / 1440)}d ago`
 }
+const exactTime = (value) => value
+  ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium', timeStyle: 'medium' }).format(new Date(value))
+  : '—'
 const uniqueScans = (rows) => {
   const seen = new Set()
   return rows.filter((row) => {
@@ -114,16 +119,24 @@ function HomePage({ navigate }) {
   const [overview, setOverview] = useState(null)
   const [scans, setScans] = useState([])
   const [locations, setLocations] = useState([])
+  const [activity, setActivity] = useState([])
   const [error, setError] = useState('')
 
   const load = async () => {
     try {
-      const [summary, recent, points] = await Promise.all([adminApi.overview(), adminApi.scans(), adminApi.locations()])
-      setOverview(summary); setScans(uniqueScans(recent || [])); setLocations(points || []); setError('')
+      const [summary, recent, points, dailyActivity] = await Promise.all([
+        adminApi.overview(), adminApi.scans(), adminApi.locations(), adminApi.scanActivity()
+      ])
+      setOverview(summary)
+      setScans(uniqueScans(recent || []))
+      setLocations((points || []).filter((point) => Number.isFinite(point.latitude)
+        && Number.isFinite(point.longitude) && Math.abs(point.latitude) <= 90
+        && Math.abs(point.longitude) <= 180))
+      setActivity(dailyActivity || [])
+      setError('')
     } catch { setError('Unable to reach the API. Check VITE_API_URL and that the backend is running.') }
   }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
-  const maxScans = Math.max(...scans.slice(0, 7).map((scan) => scan.timestamp ? 1 : 0), 1)
   const successRate = overview?.successRate ?? 0
 
   return <div className="stack">
@@ -135,16 +148,91 @@ function HomePage({ navigate }) {
       <StatCard label="SUCCESS RATE" value={`${Number(successRate).toFixed(1)}%`} detail="of scans verified as real" accent="green" />
     </div>
     <div className="content-grid">
-      <section className="panel chart-panel"><div className="panel-heading"><div><h2>Scan activity</h2><span className="muted">Recent verification attempts</span></div><button className="text-button" onClick={() => navigate('security')}>View security →</button></div>
-        <div className="activity-chart">{[70, 40, 82, 55, 90, 52, 68].map((height, index) => <div className="bar-group" key={index}><div className="bar" style={{ height: `${height}%` }} /><span>{['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][index]}</span></div>)}</div>
-        <div className="chart-legend"><span><i className="legend-dot verified" /> Verified</span><span><i className="legend-dot flagged" /> Flagged</span></div>
+      <section className="panel chart-panel"><div className="panel-heading"><div><h2>Scan activity</h2><span className="muted">Daily attempts · last 7 days (UTC)</span></div><button className="text-button" onClick={() => navigate('security')}>View security →</button></div>
+        <ActivityChart rows={activity} />
       </section>
-      <section className="panel"><div className="panel-heading"><div><h2>Verified scan locations</h2><span className="muted">{number(locations.length)} approximate GeoIP locations</span></div></div><div className="map-placeholder"><div className="map-grid" />{locations.slice(0, 12).map((point, index) => <span className="map-pin" key={`${point.latitude}-${point.longitude}-${index}`} style={{ left: `${5 + ((point.longitude + 180) / 360) * 90}%`, top: `${5 + ((90 - point.latitude) / 180) * 90}%` }} />)}<div className="map-caption">{locations.length ? 'Approximate locations of verified scans (GeoIP)' : 'No verified GeoIP locations yet'}</div></div><a className="geoip-attribution" href="https://www.maxmind.com/" target="_blank" rel="noreferrer">This product includes GeoLite Data created by MaxMind, available from MaxMind.</a></section>
+      <section className="panel"><div className="panel-heading"><div><h2>Verified scan locations</h2><span className="muted">{number(locations.length)} recent locations · GPS when shared, otherwise approximate IP</span></div></div>
+        {locations.length
+          ? <LocationMap locations={locations} />
+          : <div className="location-map-empty">No verified scans with shared GPS or GeoIP coordinates yet.</div>}
+        <p className="map-caption-note">Device GPS is optional, user-shared, and may be inaccurate or spoofed. IP-based locations are approximate. Tile requests go to OpenStreetMap.</p>
+        <a className="geoip-attribution" href="https://www.maxmind.com/" target="_blank" rel="noreferrer">This product includes GeoLite Data created by MaxMind, available from MaxMind.</a>
+      </section>
     </div>
     <section className="panel"><div className="panel-heading"><div><h2>Latest scans</h2><span className="muted">The most recent activity across your tags</span></div><button className="text-button" onClick={() => navigate('security')}>All activity →</button></div>
       <ScanTable rows={scans.slice(0, 6)} security />
     </section>
   </div>
+}
+
+function ActivityChart({ rows }) {
+  if (!rows.length) return <div className="empty-state">No activity summary is available yet.</div>
+  const maxTotal = Math.max(...rows.map((row) => row.total), 1)
+  const verifiedTotal = rows.reduce((total, row) => total + row.verified, 0)
+  const flaggedTotal = rows.reduce((total, row) => total + row.flagged, 0)
+  return <>
+    <div className="activity-totals"><span><strong>{number(verifiedTotal)}</strong> verified</span><span><strong>{number(flaggedTotal)}</strong> flagged</span></div>
+    <div className="activity-chart" role="img" aria-label="Daily verified and flagged scan counts for the last seven days">
+      {rows.map((row) => {
+        const totalHeight = row.total ? Math.max(4, row.total / maxTotal * 100) : 0
+        const day = new Date(`${row.day}T00:00:00Z`).toLocaleDateString(undefined, { weekday: 'short', timeZone: 'UTC' })
+        return <div className="bar-group" key={row.day}>
+          <span className="bar-count">{row.total || ''}</span>
+          <div className="bar-track">
+            <div className="bar-stack" style={{ height: `${totalHeight}%` }} title={`${row.day}: ${row.total} scans`}>
+              <span className="bar-segment flagged" style={{ height: `${row.total ? row.flagged / row.total * 100 : 0}%` }} />
+              <span className="bar-segment verified" style={{ height: `${row.total ? row.verified / row.total * 100 : 0}%` }} />
+            </div>
+          </div>
+          <span>{day}</span>
+        </div>
+      })}
+    </div>
+    <div className="chart-legend"><span><i className="legend-dot verified" /> Verified</span><span><i className="legend-dot flagged" /> Flagged</span></div>
+  </>
+}
+
+function LocationMap({ locations }) {
+  return <MapContainer center={[20, 0]} zoom={2} scrollWheelZoom={false} className="location-map">
+    <TileLayer
+      attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
+      url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+    />
+    <MapAutoFit locations={locations} />
+    {locations.map((point, index) => <CircleMarker
+      key={`${point.latitude}-${point.longitude}-${index}`}
+      center={[point.latitude, point.longitude]}
+      radius={7}
+      pathOptions={{ color: '#ffffff', weight: 2, fillColor: '#087f6b', fillOpacity: 0.85 }}
+    >
+      <Popup>
+        <strong>{point.source === 'DEVICE_GPS'
+          ? 'User-shared device location (unverified)'
+          : 'Approximate GeoIP network location'}</strong><br />
+        {point.latitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}, {point.longitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}
+        {point.timestamp && <><br />{exactTime(point.timestamp)}</>}
+      </Popup>
+    </CircleMarker>)}
+  </MapContainer>
+}
+
+function MapAutoFit({ locations }) {
+  const map = useMap()
+  const previousLocations = useRef('')
+  const locationSignature = locations.map((point) => `${point.latitude},${point.longitude}`).join(';')
+  useEffect(() => {
+    if (locationSignature === previousLocations.current) return
+    previousLocations.current = locationSignature
+    if (locations.length === 1) {
+      map.setView([locations[0].latitude, locations[0].longitude], 5)
+    } else if (locations.length > 1) {
+      map.fitBounds(locations.map((point) => [point.latitude, point.longitude]), {
+        padding: [20, 20],
+        maxZoom: 5
+      })
+    }
+  }, [locations, locationSignature, map])
+  return null
 }
 
 function ScanTable({ rows, security = false }) {
@@ -155,12 +243,17 @@ function ScanTable({ rows, security = false }) {
     const geoCoordinates = row.geoLatitude != null && row.geoLongitude != null
       ? `${Number(row.geoLatitude).toFixed(3)}, ${Number(row.geoLongitude).toFixed(3)}`
       : ''
-    const locationEvidence = geoPlace
+    const deviceCoordinates = row.deviceLatitude != null && row.deviceLongitude != null
+      ? `${Number(row.deviceLatitude).toFixed(5)}, ${Number(row.deviceLongitude).toFixed(5)}`
+      : ''
+    const locationEvidence = deviceCoordinates
+      ? `User-shared device GPS (unverified): ${deviceCoordinates}`
+      : geoPlace
       ? `GeoIP: ${geoPlace}${row.geoCountryIsoCode ? ` (${row.geoCountryIsoCode})` : ''}${geoCoordinates ? ` · ${geoCoordinates}` : ''}`
       : row.latitude != null && row.longitude != null
         ? `Client-supplied coordinates (untrusted): ${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}`
         : 'No GeoIP location'
-    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td>{timeAgo(row.timestamp)}</td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}</td><td>{row.expectedCounter ?? '—'}</td>{security && <><td>{locationEvidence}</td><td><code>{row.ipAddress || '—'}</code></td></>}</tr>
+    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}</td><td>{row.expectedCounter ?? '—'}</td>{security && <><td>{locationEvidence}</td><td><code>{row.ipAddress || '—'}</code></td></>}</tr>
   })}</tbody></table></div>
 }
 

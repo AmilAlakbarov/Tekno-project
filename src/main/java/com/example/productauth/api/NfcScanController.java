@@ -4,11 +4,19 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpStatus;
+import org.springframework.validation.annotation.Validated;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.RequestBody;
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import com.example.productauth.api.dto.ProductSummary;
 import com.example.productauth.api.dto.VerifyResponse;
 import com.example.productauth.service.VerificationService;
@@ -21,6 +29,7 @@ import java.util.Map;
 
 @RestController
 @RequestMapping("/nfc")
+@Validated
 public class NfcScanController {
 
     private static final Logger log = LoggerFactory.getLogger(NfcScanController.class);
@@ -64,6 +73,34 @@ public class NfcScanController {
         return page(result.status(), result.message(), uid, counter, cmac, result.product());
     }
 
+    @PostMapping(path = "/v1/location", consumes = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<String> attachDeviceLocation(@Valid @RequestBody DeviceLocationRequest location) {
+        if (!Double.isFinite(location.latitude()) || location.latitude() < -90 || location.latitude() > 90
+                || !Double.isFinite(location.longitude()) || location.longitude() < -180
+                || location.longitude() > 180) {
+            return ResponseEntity.badRequest().body("Coordinates are outside valid latitude/longitude ranges.");
+        }
+        int counter;
+        try {
+            counter = Integer.parseInt(location.counter(), 16);
+        } catch (NumberFormatException exception) {
+            return ResponseEntity.badRequest().body("Scan counter is invalid.");
+        }
+        if (!verificationService.attachDeviceLocation(location.uid(), counter,
+                location.latitude(), location.longitude())) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("Location could not be attached; this verified scan may not exist or already has a location.");
+        }
+        return ResponseEntity.noContent().build();
+    }
+
+    public record DeviceLocationRequest(
+            @NotBlank @Pattern(regexp = "(?i)[0-9a-f]{14}") String uid,
+            @NotBlank @Pattern(regexp = "(?i)[0-9a-f]{6}") String counter,
+            @NotNull Double latitude,
+            @NotNull Double longitude) {
+    }
+
     private String clientIp(HttpServletRequest request) {
         String forwarded = request.getHeader("X-Forwarded-For");
         return forwarded == null || forwarded.isBlank()
@@ -93,6 +130,56 @@ public class NfcScanController {
         String accentBackground = authentic ? "#e6f5f1" : replay ? "#fff7df" : "#fff0ef";
         String accentColor = authentic ? "#087f6b" : replay ? "#a86b00" : "#c84b45";
         String eyebrow = authentic ? "Verified" : replay ? "Security warning" : "Not verified";
+        String locationShare = authentic
+                ? """
+                  <section class="location-share">
+                    <p>Optional: share this device's location as additional scan evidence. NFC authentication is already complete; declining does not affect the result. Device location may be inaccurate or spoofed.</p>
+                    <button id="share-location" type="button" data-uid="%s" data-counter="%s">Share device location (optional)</button>
+                    <p id="location-status" role="status" aria-live="polite"></p>
+                  </section>
+                  <script>
+                    const locationButton = document.getElementById('share-location');
+                    locationButton.addEventListener('click', () => {
+                      const status = document.getElementById('location-status');
+                      if (!navigator.geolocation) {
+                        status.textContent = 'Device location is not available in this browser.';
+                        return;
+                      }
+                      locationButton.disabled = true;
+                      status.textContent = 'Requesting optional location permission…';
+                      navigator.geolocation.getCurrentPosition(async (position) => {
+                        try {
+                          const csrfResponse = await fetch('/api/v1/auth/csrf', { credentials: 'same-origin' });
+                          if (!csrfResponse.ok) throw new Error('Could not prepare a secure location submission.');
+                          const csrf = await csrfResponse.json();
+                          const response = await fetch('/nfc/v1/location', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: { 'Content-Type': 'application/json', [csrf.headerName]: csrf.token },
+                            body: JSON.stringify({
+                              uid: locationButton.dataset.uid,
+                              counter: locationButton.dataset.counter,
+                              latitude: position.coords.latitude,
+                              longitude: position.coords.longitude
+                            })
+                          });
+                          if (!response.ok) throw new Error(await response.text());
+                          status.textContent = 'Device location was added to this scan as user-shared evidence.';
+                          locationButton.textContent = 'Location shared';
+                        } catch (error) {
+                          status.textContent = error.message || 'Could not save device location.';
+                          locationButton.disabled = false;
+                        }
+                      }, (error) => {
+                        status.textContent = error.code === 1
+                          ? 'Permission was denied. NFC authentication remains valid.'
+                          : 'Device location could not be read. NFC authentication remains valid.';
+                        locationButton.disabled = false;
+                      }, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+                    });
+                  </script>
+                  """.formatted(uid.toUpperCase(Locale.ROOT), counter.toUpperCase(Locale.ROOT))
+                : "";
 
         String html = """
                 <!doctype html>
@@ -125,6 +212,13 @@ public class NfcScanController {
                       letter-spacing: .12em; text-transform: uppercase; }
                     h1 { margin: 0; font-size: clamp(28px, 7vw, 38px); letter-spacing: -.045em; }
                     .message { margin: 14px auto 0; max-width: 350px; color: #60717a; line-height: 1.55; }
+                    .location-share { margin-top: 24px; padding: 16px; border-radius: 14px;
+                      background: #f7f9fa; border: 1px solid #edf1f2; text-align: left; }
+                    .location-share p { margin: 0; color: #60717a; font-size: 12px; line-height: 1.5; }
+                    .location-share button { margin-top: 12px; padding: 10px 14px; border: 0;
+                      border-radius: 9px; background: #087f6b; color: white; font-weight: 700; cursor: pointer; }
+                    .location-share button:disabled { opacity: .65; cursor: wait; }
+                    .location-share #location-status { margin-top: 10px; }
                     .product { margin-top: 28px; padding: 18px; border-radius: 16px; text-align: left;
                       background: #f7f9fa; border: 1px solid #edf1f2; }
                     .product-label { color: #7a8990; font-size: 11px; font-weight: 800; letter-spacing: .1em;
@@ -158,6 +252,7 @@ public class NfcScanController {
                         <div class="manufacturer">%s</div>
                       </div>
                       <div class="meta"><span>%s</span>%s</div>
+                      %s
                     </section>
                     <footer class="bottom"><strong>Authentichain Team</strong> · Secure NFC identity</footer>
                   </main>
@@ -165,7 +260,7 @@ public class NfcScanController {
                 </html>
                 """.formatted(title, accentBackground, accentColor, accentColor, accentBackground,
                 accentColor, icon, eyebrow,
-                title, safeMessage, productName, manufacturer, details, macDetail);
+                title, safeMessage, productName, manufacturer, details, macDetail, locationShare);
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 

@@ -21,6 +21,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyDouble;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
@@ -148,6 +149,33 @@ class VerificationServiceGeoIpTest {
 
         assertThat(tampered.getGeoCountry()).isNull();
         assertThat(tampered.getGeoLatitude()).isNull();
+    }
+
+    @Test
+    void attachesUserSharedDeviceLocationOnlyToAnExistingRealScan() {
+        ScanLog scan = mock(ScanLog.class);
+        when(logs.findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", 1, ScanResult.REAL)).thenReturn(Optional.of(scan));
+        when(scan.getDeviceLatitude()).thenReturn(null);
+        when(scan.getDeviceLongitude()).thenReturn(null);
+
+        assertThat(service.attachDeviceLocation("04aabbccddeeff", 1, 40.4, 49.9)).isTrue();
+
+        verify(scan).setDeviceLocation(40.4, 49.9);
+        verify(logs).save(scan);
+    }
+
+    @Test
+    void doesNotReplacePreviouslySharedDeviceLocation() {
+        ScanLog scan = mock(ScanLog.class);
+        when(logs.findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", 1, ScanResult.REAL)).thenReturn(Optional.of(scan));
+        when(scan.getDeviceLatitude()).thenReturn(40.4);
+
+        assertThat(service.attachDeviceLocation("04AABBCCDDEEFF", 1, 41.0, 50.0)).isFalse();
+
+        verify(scan, never()).setDeviceLocation(anyDouble(), anyDouble());
+        verify(logs, never()).save(scan);
         assertThat(tampered.getGeoLongitude()).isNull();
     }
 

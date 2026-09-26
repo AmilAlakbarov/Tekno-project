@@ -47,6 +47,12 @@ public class ScanLog {
     @Column(name = "geo_longitude")
     private Double geoLongitude;
 
+    @Column(name = "device_latitude")
+    private Double deviceLatitude;
+
+    @Column(name = "device_longitude")
+    private Double deviceLongitude;
+
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
 
@@ -150,6 +156,25 @@ public class ScanLog {
 
     public Double getGeoLongitude() {
         return geoLongitude;
+    }
+
+    public Double getDeviceLatitude() {
+        return deviceLatitude;
+    }
+
+    public Double getDeviceLongitude() {
+        return deviceLongitude;
+    }
+
+    public void setDeviceLocation(double latitude, double longitude) {
+        if (scanResult != ScanResult.REAL) {
+            throw new IllegalStateException("Device location can only be attached to a verified scan.");
+        }
+        if (deviceLatitude != null || deviceLongitude != null) {
+            throw new IllegalStateException("Device location has already been submitted for this scan.");
+        }
+        this.deviceLatitude = latitude;
+        this.deviceLongitude = longitude;
     }
 
     public String getIpAddress() {

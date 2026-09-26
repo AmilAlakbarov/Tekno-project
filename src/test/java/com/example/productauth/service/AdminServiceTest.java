@@ -1,5 +1,6 @@
 package com.example.productauth.service;
 
+import com.example.productauth.api.dto.AdminDtos;
 import com.example.productauth.domain.NfcTag;
 import com.example.productauth.domain.Product;
 import com.example.productauth.domain.TagStatus;
@@ -12,6 +13,7 @@ import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -27,6 +29,7 @@ import static org.mockito.Mockito.when;
 
 class AdminServiceTest {
     private NfcTagRepository nfcTagRepository;
+    private ScanLogRepository scanLogRepository;
     private ProductRepository productRepository;
     private HsmClient hsmClient;
     private AdminService service;
@@ -34,10 +37,10 @@ class AdminServiceTest {
     @BeforeEach
     void setUp() {
         nfcTagRepository = mock(NfcTagRepository.class);
+        scanLogRepository = mock(ScanLogRepository.class);
         productRepository = mock(ProductRepository.class);
         hsmClient = mock(HsmClient.class);
-        service = new AdminService(nfcTagRepository, mock(ScanLogRepository.class),
-                productRepository, hsmClient);
+        service = new AdminService(nfcTagRepository, scanLogRepository, productRepository, hsmClient);
     }
 
     @Test
@@ -50,6 +53,20 @@ class AdminServiceTest {
 
         verify(nfcTagRepository).searchTags(
                 eq(""), eq(""), isNull(), eq(""), eq(""), isNull(), eq(pageable));
+    }
+
+    @Test
+    void mapsDailyScanActivityFromRepository() {
+        var day = LocalDate.of(2026, 9, 26);
+        var activity = mock(ScanLogRepository.DailyScanActivity.class);
+        when(activity.getDay()).thenReturn(day);
+        when(activity.getTotal()).thenReturn(8L);
+        when(activity.getVerified()).thenReturn(5L);
+        when(activity.getFlagged()).thenReturn(3L);
+        when(scanLogRepository.findDailyActivityForLastSevenDays()).thenReturn(List.of(activity));
+
+        assertThat(service.scanActivity()).containsExactly(
+                new AdminDtos.ActivityPoint(day, 8, 5, 3));
     }
 
     @Test

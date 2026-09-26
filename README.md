@@ -35,6 +35,18 @@ remain recorded as explicitly untrusted client-provided evidence and are never
 used as an authoritative travel baseline. Public NFC URLs obtain location from
 the source IP when GeoIP is configured.
 
+The dashboard overview map uses OpenStreetMap tiles and plots up to 100 recent
+verified scan locations, preferring user-shared device GPS when available and
+otherwise using approximate GeoIP points. After a successful NFC verification,
+the result page offers an optional browser location-permission prompt. Declining
+does not affect NFC authentication. Shared device coordinates are user-provided,
+may be inaccurate or spoofed, and are stored as separate, untrusted evidence;
+they are not used for impossible-travel decisions. Map tile requests go from the
+dashboard browser to OpenStreetMap and disclose the requested map area and
+browser IP to the tile provider; scan IPs are still resolved locally. The
+overview activity chart reports daily verified and flagged scan counts for the
+last seven UTC days.
+
 ## Local development
 
 Requirements: Java 21, Maven, Docker, Node.js, and Python 3.

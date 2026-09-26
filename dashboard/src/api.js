@@ -59,6 +59,7 @@ export const adminApi = {
   overview: () => api.get('/api/v1/admin/overview').then(({ data }) => data),
   tags: (params = {}) => api.get('/api/v1/admin/tags', { params }).then(({ data }) => data),
   scans: () => api.get('/api/v1/admin/scans').then(({ data }) => data),
+  scanActivity: () => api.get('/api/v1/admin/scans/activity').then(({ data }) => data),
   securityEvents: () => api.get('/api/v1/admin/security-events').then(({ data }) => data),
   locations: () => api.get('/api/v1/admin/scans/locations').then(({ data }) => data),
   revokeTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/revoke`).then(({ data }) => data),

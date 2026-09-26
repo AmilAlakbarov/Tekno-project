@@ -81,11 +81,26 @@ public class AdminService {
     }
 
     @Transactional(readOnly = true)
+    public List<AdminDtos.ActivityPoint> scanActivity() {
+        return scanLogRepository.findDailyActivityForLastSevenDays().stream()
+                .map(activity -> new AdminDtos.ActivityPoint(activity.getDay(), activity.getTotal(),
+                        activity.getVerified(), activity.getFlagged()))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public List<AdminDtos.LocationPoint> locations() {
         return scanLogRepository
-                .findTop100ByScanResultAndGeoLatitudeIsNotNullAndGeoLongitudeIsNotNullOrderByScannedAtDesc(
-                        ScanResult.REAL)
-                .stream().map(log -> new AdminDtos.LocationPoint(log.getGeoLatitude(), log.getGeoLongitude()))
+                .findTop100ByOrderByScannedAtDesc()
+                .stream()
+                .filter(log -> log.getScanResult() == ScanResult.REAL
+                        && (log.getDeviceLatitude() != null && log.getDeviceLongitude() != null
+                        || log.getGeoLatitude() != null && log.getGeoLongitude() != null))
+                .map(log -> log.getDeviceLatitude() != null
+                        ? new AdminDtos.LocationPoint(log.getDeviceLatitude(), log.getDeviceLongitude(),
+                                "DEVICE_GPS", log.getScannedAt().toString())
+                        : new AdminDtos.LocationPoint(log.getGeoLatitude(), log.getGeoLongitude(),
+                                "GEOIP", log.getScannedAt().toString()))
                 .toList();
     }
 

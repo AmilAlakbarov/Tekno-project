@@ -57,6 +57,11 @@ public class AdminController {
         return adminService.scans();
     }
 
+    @GetMapping("/scans/activity")
+    public List<AdminDtos.ActivityPoint> scanActivity() {
+        return adminService.scanActivity();
+    }
+
     @GetMapping("/security-events")
     public List<AdminDtos.ScanRow> securityEvents() {
         return adminService.securityEvents();

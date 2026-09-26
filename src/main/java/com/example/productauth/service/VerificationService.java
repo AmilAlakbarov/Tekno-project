@@ -145,6 +145,20 @@ public class VerificationService {
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
+    @Transactional
+    public boolean attachDeviceLocation(String uid, int counter, double latitude, double longitude) {
+        String normalizedUid = uid.toUpperCase(Locale.ROOT);
+        Optional<ScanLog> scan = scanLogRepository.findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
+                normalizedUid, counter, ScanResult.REAL);
+        if (scan.isEmpty() || scan.get().getDeviceLatitude() != null
+                || scan.get().getDeviceLongitude() != null) {
+            return false;
+        }
+        scan.get().setDeviceLocation(latitude, longitude);
+        scanLogRepository.save(scan.get());
+        return true;
+    }
+
     private VerifyResponse recordFailure(VerifyRequest request, String ipAddress, ScanResult result, NfcTag tag,
             String message, Integer receivedCounter, Integer expectedCounter) {
         saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress, result,

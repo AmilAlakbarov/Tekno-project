@@ -6,6 +6,7 @@ import com.example.productauth.domain.ScanResult;
 import com.example.productauth.domain.TagStatus;
 
 import java.time.Instant;
+import java.time.LocalDate;
 import java.util.UUID;
 import com.example.productauth.domain.ProvisioningBatch;
 
@@ -30,17 +31,22 @@ public final class AdminDtos {
                           Double latitude, Double longitude, Integer receivedCounter,
                           Integer expectedCounter, String ipAddress, String geoCountry,
                           String geoCountryIsoCode, String geoRegion, String geoCity,
-                          Double geoLatitude, Double geoLongitude) {
+                          Double geoLatitude, Double geoLongitude,
+                          Double deviceLatitude, Double deviceLongitude) {
         public static ScanRow from(ScanLog log) {
             return new ScanRow(log.getId().toString(), log.getTagUid(), log.getScannedAt(),
                     log.getScanResult(), log.getLatitude(), log.getLongitude(),
                     log.getReceivedCounter(), log.getExpectedCounter(), log.getIpAddress(),
                     log.getGeoCountry(), log.getGeoCountryIsoCode(), log.getGeoRegion(),
-                    log.getGeoCity(), log.getGeoLatitude(), log.getGeoLongitude());
+                    log.getGeoCity(), log.getGeoLatitude(), log.getGeoLongitude(),
+                    log.getDeviceLatitude(), log.getDeviceLongitude());
         }
     }
 
-    public record LocationPoint(double latitude, double longitude) {
+    public record LocationPoint(double latitude, double longitude, String source, String timestamp) {
+    }
+
+    public record ActivityPoint(LocalDate day, long total, long verified, long flagged) {
     }
 
     public record ProductRow(UUID id, String name, String manufacturer, long tagCount) {
