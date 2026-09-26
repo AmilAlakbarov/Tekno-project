@@ -61,8 +61,8 @@ public class AdminService {
     @Transactional(readOnly = true)
     public Page<AdminDtos.TagRow> tags(Pageable pageable, TagFilters filters) {
         Page<NfcTag> tags = nfcTagRepository.searchTags(
-                blankToNull(filters.uid()), blankToNull(filters.query()), filters.productId(),
-                blankToNull(filters.productName()), blankToNull(filters.manufacturer()),
+                blankToEmpty(filters.uid()), blankToEmpty(filters.query()), filters.productId(),
+                blankToEmpty(filters.productName()), blankToEmpty(filters.manufacturer()),
                 filters.status(), pageable);
         return tags.map(AdminDtos.TagRow::from);
     }
@@ -196,6 +196,10 @@ public class AdminService {
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    private String blankToEmpty(String value) {
+        return value == null ? "" : value.trim();
     }
 
     public record TagFilters(String uid, String query, UUID productId, String productName,

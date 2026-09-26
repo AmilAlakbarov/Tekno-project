@@ -34,8 +34,8 @@ public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
     @Query("""
             SELECT tag FROM NfcTag tag
             JOIN tag.product product
-            WHERE (:uid IS NULL OR LOWER(tag.tagUid) LIKE LOWER(CONCAT('%', :uid, '%')))
-              AND (:q IS NULL
+            WHERE (:uid = '' OR LOWER(tag.tagUid) LIKE LOWER(CONCAT('%', :uid, '%')))
+              AND (:q = ''
                    OR LOWER(tag.tagUid) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(product.name) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(product.manufacturer) LIKE LOWER(CONCAT('%', :q, '%'))
@@ -43,8 +43,8 @@ public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
                    OR LOWER(COALESCE(tag.description, '')) LIKE LOWER(CONCAT('%', :q, '%'))
                    OR LOWER(CAST(product.id AS string)) LIKE LOWER(CONCAT('%', :q, '%')))
               AND (:productId IS NULL OR product.id = :productId)
-              AND (:productName IS NULL OR LOWER(product.name) LIKE LOWER(CONCAT('%', :productName, '%')))
-              AND (:manufacturer IS NULL OR LOWER(product.manufacturer) LIKE LOWER(CONCAT('%', :manufacturer, '%')))
+              AND (:productName = '' OR LOWER(product.name) LIKE LOWER(CONCAT('%', :productName, '%')))
+              AND (:manufacturer = '' OR LOWER(product.manufacturer) LIKE LOWER(CONCAT('%', :manufacturer, '%')))
               AND (:status IS NULL OR tag.status = :status)
             """)
     Page<NfcTag> searchTags(@Param("uid") String uid, @Param("q") String query,

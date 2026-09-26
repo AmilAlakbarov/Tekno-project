@@ -7,6 +7,8 @@ import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ProductRepository;
 import com.example.productauth.repository.ScanLogRepository;
 import jakarta.persistence.EntityNotFoundException;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -16,8 +18,11 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 class AdminServiceTest {
@@ -33,6 +38,18 @@ class AdminServiceTest {
         hsmClient = mock(HsmClient.class);
         service = new AdminService(nfcTagRepository, mock(ScanLogRepository.class),
                 productRepository, hsmClient);
+    }
+
+    @Test
+    void tagSearchUsesEmptyStringsForUnspecifiedTextFilters() {
+        var pageable = PageRequest.of(0, 25);
+        when(nfcTagRepository.searchTags("", "", null, "", "", null, pageable))
+                .thenReturn(new PageImpl<>(List.of(), pageable, 0));
+
+        service.tags(pageable, new AdminService.TagFilters(null, null, null, null, null, null));
+
+        verify(nfcTagRepository).searchTags(
+                eq(""), eq(""), isNull(), eq(""), eq(""), isNull(), eq(pageable));
     }
 
     @Test

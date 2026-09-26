@@ -193,8 +193,15 @@ function TagsPage() {
         totalPages: result.totalPages ?? (rows.length < pageSize ? pageIndex + 1 : pageIndex + 2)
       })
       setError('')
-    } catch {
-      setError('Could not load the tag registry.')
+    } catch (requestError) {
+      const status = requestError?.response?.status
+      if (status === 401 || status === 403) {
+        setError('Tag registry access denied. Sign in again with an ADMIN, OPERATOR, or VIEWER account.')
+      } else if (status) {
+        setError(`Could not load the tag registry (API returned HTTP ${status}).`)
+      } else {
+        setError('Could not reach the API while loading the tag registry. Check the connection and backend status.')
+      }
     } finally {
       setLoading(false)
     }
