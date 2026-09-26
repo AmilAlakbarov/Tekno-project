@@ -41,7 +41,7 @@ public class ProvisioningService {
     public List<AdminDtos.ProductRow> products() {
         return productRepository.findAll().stream()
                 .map(product -> new AdminDtos.ProductRow(product.getId(), product.getName(),
-                        product.getManufacturer()))
+                        product.getManufacturer(), nfcTagRepository.countByProductId(product.getId())))
                 .toList();
     }
 
@@ -52,7 +52,7 @@ public class ProvisioningService {
         }
         Product product = new Product(UUID.randomUUID(), name.trim(), manufacturer.trim(), null);
         return new AdminDtos.ProductRow(productRepository.save(product).getId(), product.getName(),
-                product.getManufacturer());
+                product.getManufacturer(), 0);
     }
 
     @Transactional

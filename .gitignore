@@ -4,6 +4,7 @@ target/
 dashboard/node_modules/
 dashboard/dist/
 *.iml
+*.mmdb
 .env
 service-account*.json
 tools/simulator/simulator_vault.json
@@ -11,4 +12,4 @@ tools/simulator/provisioning_manifest.json
 tools/simulator/provisioning_keys.csv
 tools/simulator/.venv/
 scripts/*
-TESTING_AND_JURY_DEMO.md
+Ignore/*

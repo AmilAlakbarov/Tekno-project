@@ -16,7 +16,11 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Set;
+import java.util.UUID;
 import com.example.productauth.api.AdminController.MetadataRequest;
 
 @Service
@@ -51,9 +55,15 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public Page<AdminDtos.TagRow> tags(Pageable pageable, String uid) {
-        Page<NfcTag> tags = uid == null || uid.isBlank()
-                ? nfcTagRepository.findAll(pageable)
-                : nfcTagRepository.findByTagUidContainingIgnoreCase(uid.trim(), pageable);
+        return tags(pageable, new TagFilters(uid, "", null, "", "", null));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AdminDtos.TagRow> tags(Pageable pageable, TagFilters filters) {
+        Page<NfcTag> tags = nfcTagRepository.searchTags(
+                blankToNull(filters.uid()), blankToNull(filters.query()), filters.productId(),
+                blankToNull(filters.productName()), blankToNull(filters.manufacturer()),
+                filters.status(), pageable);
         return tags.map(AdminDtos.TagRow::from);
     }
 
@@ -72,8 +82,11 @@ public class AdminService {
 
     @Transactional(readOnly = true)
     public List<AdminDtos.LocationPoint> locations() {
-        return scanLogRepository.findTop100ByLatitudeIsNotNullAndLongitudeIsNotNullOrderByScannedAtDesc()
-                .stream().map(log -> new AdminDtos.LocationPoint(log.getLatitude(), log.getLongitude())).toList();
+        return scanLogRepository
+                .findTop100ByScanResultAndGeoLatitudeIsNotNullAndGeoLongitudeIsNotNullOrderByScannedAtDesc(
+                        ScanResult.REAL)
+                .stream().map(log -> new AdminDtos.LocationPoint(log.getGeoLatitude(), log.getGeoLongitude()))
+                .toList();
     }
 
     @Transactional
@@ -115,17 +128,77 @@ public class AdminService {
     }
 
     @Transactional
-    public void deleteProduct(java.util.UUID productId) {
-        if (!productRepository.existsById(productId)) {
-            throw new EntityNotFoundException("Product was not found: " + productId);
+    public int bulkTags(List<String> uids, String action) {
+        if (uids == null || uids.isEmpty()) {
+            throw new IllegalArgumentException("At least one tag UID is required.");
         }
-        if (nfcTagRepository.countByProductId(productId) > 0) {
-            throw new IllegalStateException("Delete or revoke the product's tags before deleting the product.");
+        if (uids.stream().anyMatch(uid -> uid == null || uid.isBlank())) {
+            throw new IllegalArgumentException("Tag UIDs must not be blank.");
         }
-        productRepository.deleteById(productId);
+
+        String normalizedAction = action == null ? "" : action.trim().toUpperCase(Locale.ROOT);
+        if (!Set.of("REVOKE", "ACTIVATE", "DELETE").contains(normalizedAction)) {
+            throw new IllegalArgumentException("Action must be REVOKE, ACTIVATE, or DELETE.");
+        }
+
+        LinkedHashSet<String> normalizedUids = new LinkedHashSet<>();
+        for (String uid : uids) {
+            String normalizedUid = uid.trim().toUpperCase(Locale.ROOT);
+            if (!normalizedUid.matches("[0-9A-F]{14}")) {
+                throw new IllegalArgumentException("Invalid tag UID: " + uid);
+            }
+            normalizedUids.add(normalizedUid);
+        }
+
+        List<NfcTag> tags = nfcTagRepository.findByTagUidIn(new ArrayList<>(normalizedUids));
+        if (tags.size() != normalizedUids.size()) {
+            Set<String> foundUids = new LinkedHashSet<>();
+            tags.forEach(tag -> foundUids.add(tag.getTagUid()));
+            normalizedUids.removeAll(foundUids);
+            throw new EntityNotFoundException("Tags were not found: " + String.join(", ", normalizedUids));
+        }
+
+        switch (normalizedAction) {
+            case "REVOKE" -> tags.forEach(tag -> tag.setStatus(TagStatus.REVOKED));
+            case "ACTIVATE" -> tags.forEach(tag -> tag.setStatus(TagStatus.ACTIVE));
+            case "DELETE" -> {
+                deleteHsmKeys(tags);
+                nfcTagRepository.deleteAll(tags);
+                nfcTagRepository.flush();
+            }
+            default -> throw new IllegalStateException("Unsupported tag action: " + normalizedAction);
+        }
+        return tags.size();
+    }
+
+    @Transactional
+    public void deleteProduct(UUID productId) {
+        var product = productRepository.findById(productId)
+                .orElseThrow(() -> new EntityNotFoundException("Product was not found: " + productId));
+        List<NfcTag> tags = nfcTagRepository.findByProductId(productId);
+        deleteHsmKeys(tags);
+        nfcTagRepository.deleteAll(tags);
+        nfcTagRepository.flush();
+        productRepository.delete(product);
+    }
+
+    private void deleteHsmKeys(List<NfcTag> tags) {
+        for (NfcTag tag : tags) {
+            try {
+                hsmClient.deleteKey(tag.getTagUid());
+            } catch (RuntimeException exception) {
+                throw new IllegalStateException(
+                        "Could not delete HSM key for tag " + tag.getTagUid() + "; no tag records were deleted.",
+                        exception);
+            }
+        }
     }
 
     private String blankToNull(String value) {
         return value == null || value.isBlank() ? null : value.trim();
+    }
+
+    public record TagFilters(String uid, String query, UUID productId, String productName,
+            String manufacturer, TagStatus status) {
     }
 }

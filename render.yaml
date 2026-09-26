@@ -14,6 +14,8 @@ services:
         value: https://authentichain-hsm.onrender.com
       - key: HSM_SERVICE_TOKEN
         sync: false
+      - key: GEOIP_LICENSE_KEY
+        sync: false
       - key: ADMIN_USERNAME
         value: admin
       - key: ADMIN_PASSWORD

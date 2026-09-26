@@ -1,6 +1,7 @@
 package com.example.productauth.api;
 
 import com.example.productauth.api.dto.AdminDtos;
+import com.example.productauth.domain.TagStatus;
 import com.example.productauth.service.AdminService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -10,6 +11,8 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
 import org.springframework.web.multipart.MultipartFile;
 import com.example.productauth.service.ProvisioningService;
@@ -36,11 +39,17 @@ public class AdminController {
     public Page<AdminDtos.TagRow> tags(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "25") int size,
-            @RequestParam(defaultValue = "") String uid) {
+            @RequestParam(defaultValue = "") String uid,
+            @RequestParam(defaultValue = "") String q,
+            @RequestParam(required = false) UUID productId,
+            @RequestParam(defaultValue = "") String productName,
+            @RequestParam(defaultValue = "") String manufacturer,
+            @RequestParam(required = false) TagStatus status) {
         int safePage = Math.max(page, 0);
         int safeSize = Math.min(Math.max(size, 1), 100);
         return adminService.tags(PageRequest.of(safePage, safeSize,
-                Sort.by(Sort.Direction.DESC, "lastScanCounter")), uid);
+                Sort.by(Sort.Direction.DESC, "lastScanCounter")),
+                new AdminService.TagFilters(uid, q, productId, productName, manufacturer, status));
     }
 
     @GetMapping("/scans")
@@ -72,6 +81,11 @@ public class AdminController {
     public ResponseEntity<Void> deleteTag(@PathVariable String uid) {
         adminService.deleteTag(uid);
         return ResponseEntity.noContent().build();
+    }
+
+    @PostMapping("/tags/bulk")
+    public AdminDtos.BulkActionResult bulkTags(@Valid @RequestBody BulkTagRequest request) {
+        return new AdminDtos.BulkActionResult(adminService.bulkTags(request.uids(), request.action()));
     }
 
     @GetMapping("/products")
@@ -112,5 +126,10 @@ public class AdminController {
     public record ProductRequest(
             @Size(min = 1, max = 255) String name,
             @Size(min = 1, max = 255) String manufacturer) {
+    }
+
+    public record BulkTagRequest(
+            @NotEmpty List<@NotBlank String> uids,
+            @NotBlank String action) {
     }
 }

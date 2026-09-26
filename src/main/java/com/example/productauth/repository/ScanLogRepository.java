@@ -15,6 +15,8 @@ public interface ScanLogRepository extends JpaRepository<ScanLog, UUID> {
 
     Optional<ScanLog> findTopByTagUidOrderByScannedAtDesc(String tagUid);
 
+    Optional<ScanLog> findTopByTagUidAndScanResultOrderByScannedAtDesc(String tagUid, ScanResult scanResult);
+
     long countByScannedAtAfter(Instant timestamp);
 
     long countByScannedAtAfterAndScanResult(Instant timestamp, ScanResult scanResult);
@@ -43,7 +45,8 @@ public interface ScanLogRepository extends JpaRepository<ScanLog, UUID> {
 
     List<ScanLog> findTop100ByScanResultOrderByScannedAtDesc(ScanResult scanResult);
 
-    List<ScanLog> findTop100ByLatitudeIsNotNullAndLongitudeIsNotNullOrderByScannedAtDesc();
+    List<ScanLog> findTop100ByScanResultAndGeoLatitudeIsNotNullAndGeoLongitudeIsNotNullOrderByScannedAtDesc(
+            ScanResult scanResult);
 
     boolean existsByTagUidAndReceivedCounterAndScanResult(String tagUid, Integer receivedCounter,
             ScanResult scanResult);

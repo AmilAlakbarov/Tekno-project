@@ -24,9 +24,28 @@ public class ScanLog {
     @Column(name = "scanned_at", nullable = false)
     private Instant scannedAt;
 
+    // These are JSON scanner-submitted coordinates, not trusted GeoIP evidence.
     private Double latitude;
 
     private Double longitude;
+
+    @Column(name = "geo_country")
+    private String geoCountry;
+
+    @Column(name = "geo_country_iso_code", length = 2)
+    private String geoCountryIsoCode;
+
+    @Column(name = "geo_region")
+    private String geoRegion;
+
+    @Column(name = "geo_city")
+    private String geoCity;
+
+    @Column(name = "geo_latitude")
+    private Double geoLatitude;
+
+    @Column(name = "geo_longitude")
+    private Double geoLongitude;
 
     @Column(name = "ip_address", length = 45)
     private String ipAddress;
@@ -55,10 +74,24 @@ public class ScanLog {
 
     public ScanLog(String tagUid, Double latitude, Double longitude, String ipAddress,
             ScanResult scanResult, Integer receivedCounter, Integer expectedCounter) {
+        this(tagUid, latitude, longitude, ipAddress, scanResult, receivedCounter, expectedCounter, null);
+    }
+
+    public ScanLog(String tagUid, Double latitude, Double longitude, String ipAddress,
+            ScanResult scanResult, Integer receivedCounter, Integer expectedCounter,
+            GeoIpLocation geoLocation) {
         this.id = UUID.randomUUID();
         this.tagUid = tagUid;
         this.latitude = latitude;
         this.longitude = longitude;
+        if (scanResult == ScanResult.REAL && geoLocation != null) {
+            this.geoCountry = geoLocation.country();
+            this.geoCountryIsoCode = geoLocation.countryIsoCode();
+            this.geoRegion = geoLocation.region();
+            this.geoCity = geoLocation.city();
+            this.geoLatitude = geoLocation.latitude();
+            this.geoLongitude = geoLocation.longitude();
+        }
         this.ipAddress = ipAddress;
         this.scanResult = scanResult;
         this.receivedCounter = receivedCounter;
@@ -93,6 +126,30 @@ public class ScanLog {
 
     public Double getLongitude() {
         return longitude;
+    }
+
+    public String getGeoCountry() {
+        return geoCountry;
+    }
+
+    public String getGeoCountryIsoCode() {
+        return geoCountryIsoCode;
+    }
+
+    public String getGeoRegion() {
+        return geoRegion;
+    }
+
+    public String getGeoCity() {
+        return geoCity;
+    }
+
+    public Double getGeoLatitude() {
+        return geoLatitude;
+    }
+
+    public Double getGeoLongitude() {
+        return geoLongitude;
     }
 
     public String getIpAddress() {

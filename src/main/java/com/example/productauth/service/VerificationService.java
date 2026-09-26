@@ -4,11 +4,14 @@ import com.example.productauth.api.dto.ProductSummary;
 import com.example.productauth.api.dto.VerifyRequest;
 import com.example.productauth.api.dto.VerifyResponse;
 import com.example.productauth.domain.NfcTag;
+import com.example.productauth.domain.GeoIpLocation;
 import com.example.productauth.domain.ScanLog;
 import com.example.productauth.domain.ScanResult;
 import com.example.productauth.domain.TagStatus;
 import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ScanLogRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -19,6 +22,7 @@ import java.util.Optional;
 @Service
 public class VerificationService {
 
+    private static final Logger log = LoggerFactory.getLogger(VerificationService.class);
     private static final double EARTH_RADIUS_KM = 6371.0088;
     private static final double MAX_SPEED_KMH = 1000.0;
     private static final int MAX_COUNTER_JUMP = 1000;
@@ -27,13 +31,17 @@ public class VerificationService {
     private final ScanLogRepository scanLogRepository;
     private final SignatureVerificationService signatureVerificationService;
     private final HsmClient hsmClient;
+    private final GeoIpService geoIpService;
+
     public VerificationService(NfcTagRepository nfcTagRepository,
             ScanLogRepository scanLogRepository,
-            SignatureVerificationService signatureVerificationService, HsmClient hsmClient) {
+            SignatureVerificationService signatureVerificationService, HsmClient hsmClient,
+            GeoIpService geoIpService) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
         this.signatureVerificationService = signatureVerificationService;
         this.hsmClient = hsmClient;
+        this.geoIpService = geoIpService;
     }
 
     @Transactional
@@ -59,18 +67,20 @@ public class VerificationService {
             return recordFailure(request, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
-        if (hasSpeedAnomaly(request, uid)) {
-            return recordFailure(request, ipAddress, ScanResult.SPEED_ANOMALY, tag, "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
-        }
-
         if (!signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac())) {
             return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
+        Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
+        if (hasTravelAnomaly(uid, geoLocation)) {
+            return recordFailure(request, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
+        }
+
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress,
-                ScanResult.REAL, counter, counter + 1);
+        saveSuccessfulLog(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress,
+                counter, counter + 1, geoLocation.orElse(null));
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
     }
 
@@ -109,11 +119,6 @@ public class VerificationService {
             return recordFailure(normalizedUid, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
-        if (counter - tag.getLastScanCounter() > MAX_COUNTER_JUMP) {
-            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
-                    "Suspicious counter jump detected.", counter, tag.getLastScanCounter() + 1);
-        }
-
         boolean signatureValid = hsmClient.isConfigured()
                 ? hsmClient.verifyNtag424(normalizedUid, normalizedCounter, macInput, normalizedCmac)
                 : signatureVerificationService.matchesNtag424Sdm(
@@ -122,24 +127,22 @@ public class VerificationService {
             return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
+        if (counter - tag.getLastScanCounter() > MAX_COUNTER_JUMP) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+                    "Suspicious counter jump detected.", counter, tag.getLastScanCounter() + 1);
+        }
+
+        Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
+        if (hasTravelAnomaly(normalizedUid, geoLocation)) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
+        }
+
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
-        ScanLog scanLog = saveLog(normalizedUid, null, null, ipAddress,
-                ScanResult.REAL, counter, counter + 1);
+        saveSuccessfulLog(normalizedUid, null, null, ipAddress, counter, counter + 1,
+                geoLocation.orElse(null));
         return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
-    }
-
-    private ScanLog saveLog(VerifyRequest request, ScanResult result, Integer receivedCounter,
-            Integer expectedCounter) {
-        return saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), result,
-                receivedCounter, expectedCounter);
-    }
-
-    private VerifyResponse recordFailure(VerifyRequest request, ScanResult result, NfcTag tag, String message,
-            Integer receivedCounter, Integer expectedCounter) {
-        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), null, result,
-                receivedCounter, expectedCounter);
-        return VerifyResponse.fake(message);
     }
 
     private VerifyResponse recordFailure(VerifyRequest request, String ipAddress, ScanResult result, NfcTag tag,
@@ -149,21 +152,19 @@ public class VerificationService {
         return VerifyResponse.fake(message);
     }
 
-    private VerifyResponse recordFailure(String uid, ScanResult result, NfcTag tag, String message,
-            Integer receivedCounter, Integer expectedCounter) {
-        saveIfNew(uid, null, null, null, result, receivedCounter, expectedCounter);
-        return VerifyResponse.fake(message);
-    }
-
     private VerifyResponse recordFailure(String uid, String ipAddress, ScanResult result, NfcTag tag,
             String message, Integer receivedCounter, Integer expectedCounter) {
         saveIfNew(uid, null, null, ipAddress, result, receivedCounter, expectedCounter);
         return VerifyResponse.fake(message);
     }
 
-    private ScanLog saveLog(String uid, Double latitude, Double longitude, String ipAddress,
-            ScanResult result, Integer receivedCounter, Integer expectedCounter) {
-        return saveIfNew(uid, latitude, longitude, ipAddress, result, receivedCounter, expectedCounter);
+    private ScanLog saveSuccessfulLog(String uid, Double latitude, Double longitude, String ipAddress,
+            Integer receivedCounter, Integer expectedCounter, GeoIpLocation geoLocation) {
+        if (scanLogRepository.existsByTagUidAndReceivedCounterAndScanResult(uid, receivedCounter, ScanResult.REAL)) {
+            return null;
+        }
+        return scanLogRepository.save(new ScanLog(uid, latitude, longitude, ipAddress,
+                ScanResult.REAL, receivedCounter, expectedCounter, geoLocation));
     }
 
     private int counterOrZero(String counter) {
@@ -172,11 +173,6 @@ public class VerificationService {
         } catch (NumberFormatException exception) {
             return 0;
         }
-    }
-
-    private ScanLog saveIfNew(String uid, Double latitude, Double longitude, ScanResult result,
-            Integer receivedCounter, Integer expectedCounter) {
-        return saveIfNew(uid, latitude, longitude, null, result, receivedCounter, expectedCounter);
     }
 
     private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
@@ -189,19 +185,31 @@ public class VerificationService {
                 receivedCounter, expectedCounter));
     }
 
-    private boolean hasSpeedAnomaly(VerifyRequest request, String uid) {
-        Optional<ScanLog> previousOptional = scanLogRepository.findTopByTagUidOrderByScannedAtDesc(uid);
+    private boolean hasTravelAnomaly(String uid, Optional<GeoIpLocation> currentLocation) {
+        if (currentLocation.isEmpty()) {
+            log.info("Travel anomaly check skipped: verified scan has no GeoIP coordinates.");
+            return false;
+        }
+
+        Optional<ScanLog> previousOptional = scanLogRepository
+                .findTopByTagUidAndScanResultOrderByScannedAtDesc(uid, ScanResult.REAL);
         if (previousOptional.isEmpty()) {
             return false;
         }
 
         ScanLog previous = previousOptional.get();
-        if (previous.getLatitude() == null || previous.getLongitude() == null) {
+        if (previous.getGeoLatitude() == null || previous.getGeoLongitude() == null) {
+            log.info("Travel anomaly check skipped: latest successful scan has no GeoIP coordinates.");
             return false;
         }
 
-        double distanceKm = haversineKm(previous.getLatitude(), previous.getLongitude(),
-                request.latitude(), request.longitude());
+        GeoIpLocation location = currentLocation.get();
+        if (location.latitude() == null || location.longitude() == null) {
+            log.info("Travel anomaly check skipped: GeoIP location has no coordinates.");
+            return false;
+        }
+        double distanceKm = haversineKm(previous.getGeoLatitude(), previous.getGeoLongitude(),
+                location.latitude(), location.longitude());
         long elapsedSeconds = Duration.between(previous.getScannedAt(), java.time.Instant.now()).getSeconds();
         if (elapsedSeconds <= 0) {
             return distanceKm > 0.001;

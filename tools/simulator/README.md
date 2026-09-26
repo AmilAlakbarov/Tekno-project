@@ -1,101 +1,117 @@
-# Development HSM/tag simulator
+# Tag and HSM simulator
 
-This program is a **software simulator for development and demonstrations**.
-It is not a certified HSM, does not provide production key protection, and
-must never replace a real HSM or factory provisioning station.
-
-It lets the team demonstrate the future provisioning flow without new NFC
-tags or a reader/writer:
-
-1. Generate a custom UID and AES-128 key.
-2. Keep the key in a local simulator vault.
-3. Export a safe manifest for the dashboard.
-4. Generate an NTAG 424 SDM-style URL.
-5. Later submit a key-bearing manifest through a protected provisioning API.
-
-It also provides a localhost-only development HSM HTTP service. The service
-can create keys for requested UIDs and return a key to a local provisioning
-client. It is intentionally bound to `127.0.0.1` and must never be deployed
-to Render or exposed to the internet.
+This Python tool creates software-only NTAG-style tags, holds their test keys
+in a local vault, exports provisioning data, and generates signed SDM-style
+URLs. It is for development and demonstrations only. It is not a certified
+HSM and must never be exposed publicly or used for production keys.
 
 ## Setup on Windows
 
+Open PowerShell in the simulator directory:
+
 ```powershell
-cd tools\simulator
+Set-Location "C:\Users\Amil\Downloads\Tekno project\Tekno project\tools\simulator"
 py -m venv .venv
 .\.venv\Scripts\python.exe -m pip install -r requirements.txt
+$Python = ".\.venv\Scripts\python.exe"
 ```
 
-## Create a simulated tag
+If the virtual environment already exists, set `$Python` and continue.
+
+## Create a product and tags
+
+First create a product in the dashboard under **Provisioning**. Copy its
+complete product ID (a UUID). Then generate one or more simulator tags using
+that ID:
 
 ```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py generate `
+python tag_hsm_simulator.py generate `
+  --count 5 `
+  --product-id "PASTE-COMPLETE-PRODUCT-UUID-HERE" `
+  --name "Demo product" `
+  --description "Five virtual tags"
+```
+
+Each tag receives a unique 7-byte UID and random AES-128 key. To use a custom
+UID instead, omit `--count` and add `--uid 04ABCDEF123456`.
+
+The default files are:
+
+- `simulator_vault.json` — local UIDs, AES keys, counters, and product data
+- `provisioning_manifest.json` — safe manifest without keys
+- `provisioning_keys.csv` — provisioning CSV containing keys
+
+## Provision the tags to AuthentiChain
+
+Export a CSV:
+
+```powershell
+python tag_hsm_simulator.py export-csv `
+  --output ".\provisioning_keys.csv"
+```
+
+In the dashboard, select **Provisioning → Import provisioning CSV**, choose
+that file, and import it. The CSV requires `uid`, `aesKey`, and `productId`.
+Every product ID must exactly match an existing dashboard product UUID.
+
+When the backend is configured with `HSM_BASE_URL` and `HSM_SERVICE_TOKEN`,
+the backend sends the AES key to the HSM's authenticated
+`POST /v1/keys/import` endpoint. The HSM stores it in PostgreSQL and returns
+metadata only. Without a configured HSM, development keys may be stored by
+the backend instead.
+
+## Generate and test a signed URL
+
+After provisioning, sign a tag using its UID:
+
+```powershell
+$url = & $Python tag_hsm_simulator.py sign `
   --uid 04ABCDEF123456 `
-  --product-id demo-product-001 `
-  --name "Demo blue bottle" `
-  --description "Software-only provisioning demonstration"
+  --endpoint "https://authentichain.website/nfc/v1/verify"
+Start-Process $url
 ```
 
-If `--uid` is omitted, a random 7-byte UID beginning with `04` is created.
-The generated `simulator_vault.json` contains test key material and must not
-be committed or uploaded. It is ignored by the repository's simulator rules.
+Each normal `sign` call advances the simulator's local counter. Opening the
+same URL twice tests replay detection. Changing one hexadecimal character in
+the `cmac` query value tests tamper detection. The tag must already exist in
+the backend and HSM for a successful scan.
 
-## Generate a verification URL
+## Other useful commands
+
+Export a manifest without keys:
 
 ```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py sign `
-  --uid 04ABCDEF123456
+& $Python tag_hsm_simulator.py export `
+  --output ".\provisioning_manifest.json"
 ```
 
-Open the printed URL against the deployed backend only after that simulated
-tag has been provisioned into the backend database. Repeating `sign` advances
-the simulated counter; passing `--counter 1` intentionally creates a replay
-test once the backend has already accepted a higher counter.
-
-## Export
-
-The default manifest excludes AES keys:
+Use an isolated vault:
 
 ```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py export
+& $Python tag_hsm_simulator.py --vault ".\demo-vault.json" generate `
+  --count 2 `
+  --product-id "PASTE-COMPLETE-PRODUCT-UUID-HERE"
 ```
 
-For the future protected provisioning API only, a development operator may
-export keys explicitly:
+Start the localhost-only development HSM service:
 
 ```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py export --include-keys
+& $Python tag_hsm_simulator.py serve
 ```
 
-Do not send that file through email, commit it, or expose it to the browser.
-The eventual production design should replace this simulator with an HSM
-adapter where the backend receives a key reference or performs a secure
-factory-side import.
-
-## Local HSM service
-
-Start the service:
+It listens on `127.0.0.1:8787`. Check it from another PowerShell window:
 
 ```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py serve
+Invoke-RestMethod http://127.0.0.1:8787/health
 ```
 
-Create virtual tags and keys:
+Stop it with `Ctrl+C`. This separate simulator service is not the deployed
+PostgreSQL-backed HSM service.
 
-```powershell
-Invoke-RestMethod http://127.0.0.1:8787/v1/hsm/keys `
-  -Method Post -ContentType "application/json" `
-  -Body '{"count":3,"productId":"demo-product-001","displayName":"Demo bottle"}'
-```
+## Protect the test keys
 
-Retrieve a development key for a specific UID:
-
-```text
-GET http://127.0.0.1:8787/v1/hsm/key?uid=04ABCDEF123456
-```
-
-Export the key-bearing CSV for the future local provisioning import:
-
-```powershell
-.\.venv\Scripts\python.exe tag_hsm_simulator.py export-csv
-```
+`simulator_vault.json` and `provisioning_keys.csv` contain AES key material.
+Keep them local, do not commit or share them, and do not display the vault
+contents. The safe manifest does not contain AES keys. For production, use
+real NTAG provisioning equipment and a properly secured, certified key
+management system.

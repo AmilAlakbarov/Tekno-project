@@ -28,18 +28,25 @@ public final class AdminDtos {
 
     public record ScanRow(String id, String uid, Instant timestamp, ScanResult result,
                           Double latitude, Double longitude, Integer receivedCounter,
-                          Integer expectedCounter, String ipAddress) {
+                          Integer expectedCounter, String ipAddress, String geoCountry,
+                          String geoCountryIsoCode, String geoRegion, String geoCity,
+                          Double geoLatitude, Double geoLongitude) {
         public static ScanRow from(ScanLog log) {
             return new ScanRow(log.getId().toString(), log.getTagUid(), log.getScannedAt(),
                     log.getScanResult(), log.getLatitude(), log.getLongitude(),
-                    log.getReceivedCounter(), log.getExpectedCounter(), log.getIpAddress());
+                    log.getReceivedCounter(), log.getExpectedCounter(), log.getIpAddress(),
+                    log.getGeoCountry(), log.getGeoCountryIsoCode(), log.getGeoRegion(),
+                    log.getGeoCity(), log.getGeoLatitude(), log.getGeoLongitude());
         }
     }
 
     public record LocationPoint(double latitude, double longitude) {
     }
 
-    public record ProductRow(UUID id, String name, String manufacturer) {
+    public record ProductRow(UUID id, String name, String manufacturer, long tagCount) {
+    }
+
+    public record BulkActionResult(int affected) {
     }
 
     public record ProvisioningResult(UUID batchId, int totalRows, int importedRows,

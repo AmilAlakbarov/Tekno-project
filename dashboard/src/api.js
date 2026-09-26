@@ -6,10 +6,53 @@ const api = axios.create({
   withCredentials: true
 })
 
+const csrfClient = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:8080',
+  headers: { Accept: 'application/json' },
+  withCredentials: true
+})
+
+let csrfToken
+let csrfTokenRequest
+
+function getCsrfToken() {
+  if (csrfToken) return Promise.resolve(csrfToken)
+  if (!csrfTokenRequest) {
+    csrfTokenRequest = csrfClient.get('/api/v1/auth/csrf')
+      .then(({ data }) => {
+        if (!data?.token || !data?.headerName) {
+          throw new Error('The CSRF endpoint returned an invalid token response')
+        }
+        csrfToken = { headerName: data.headerName, token: data.token }
+        return csrfToken
+      })
+      .finally(() => {
+        csrfTokenRequest = undefined
+      })
+  }
+  return csrfTokenRequest
+}
+
+function resetCsrfToken() {
+  csrfToken = undefined
+  csrfTokenRequest = undefined
+}
+
+api.interceptors.request.use(async (config) => {
+  if (['post', 'put', 'patch', 'delete'].includes(config.method?.toLowerCase())) {
+    const token = await getCsrfToken()
+    config.headers[token.headerName] = token.token
+  }
+  return config
+})
+
 export const authApi = {
-  login: (credentials) => api.post('/api/v1/auth/login', credentials).then(({ data }) => data),
+  login: (credentials) => api.post('/api/v1/auth/login', credentials).then(({ data }) => {
+    resetCsrfToken()
+    return data
+  }),
   me: () => api.get('/api/v1/auth/me').then(({ data }) => data),
-  logout: () => api.post('/api/v1/auth/logout')
+  logout: () => api.post('/api/v1/auth/logout').finally(resetCsrfToken)
 }
 
 export const adminApi = {
@@ -21,8 +64,9 @@ export const adminApi = {
   revokeTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/revoke`).then(({ data }) => data),
   activateTag: (uid) => api.post(`/api/v1/admin/tags/${encodeURIComponent(uid)}/activate`).then(({ data }) => data),
   deleteTag: (uid) => api.delete(`/api/v1/admin/tags/${encodeURIComponent(uid)}`),
-  updateTagMetadata: (uid, metadata) => api.put(`/api/v1/admin/tags/${encodeURIComponent(uid)}/metadata`, metadata).then(({ data }) => data)
-  ,products: () => api.get('/api/v1/admin/products').then(({ data }) => data),
+  bulkTags: (uids, action) => api.post('/api/v1/admin/tags/bulk', { uids, action }).then(({ data }) => data),
+  updateTagMetadata: (uid, metadata) => api.put(`/api/v1/admin/tags/${encodeURIComponent(uid)}/metadata`, metadata).then(({ data }) => data),
+  products: () => api.get('/api/v1/admin/products').then(({ data }) => data),
   createProduct: (product) => api.post('/api/v1/admin/products', product).then(({ data }) => data),
   deleteProduct: (id) => api.delete(`/api/v1/admin/products/${encodeURIComponent(id)}`),
   importProvisioning: (file) => {
