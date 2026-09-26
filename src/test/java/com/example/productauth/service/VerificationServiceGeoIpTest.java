@@ -149,6 +149,7 @@ class VerificationServiceGeoIpTest {
 
         assertThat(tampered.getGeoCountry()).isNull();
         assertThat(tampered.getGeoLatitude()).isNull();
+        assertThat(tampered.getGeoLongitude()).isNull();
     }
 
     @Test
@@ -176,7 +177,6 @@ class VerificationServiceGeoIpTest {
 
         verify(scan, never()).setDeviceLocation(anyDouble(), anyDouble());
         verify(logs, never()).save(scan);
-        assertThat(tampered.getGeoLongitude()).isNull();
     }
 
     private ScanLog capturedScanLog() {
