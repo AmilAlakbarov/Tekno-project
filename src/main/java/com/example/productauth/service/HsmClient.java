@@ -53,6 +53,18 @@ public class HsmClient {
         return response != null && response.valid();
     }
 
+    public boolean verifyCmac(String uid, int counter, String incomingCmac) {
+        if (!configured) {
+            return false;
+        }
+        String messageHex = uid + String.format("%06X", counter);
+        VerifyResponse response = client.post().uri("/v1/cmac/verify")
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + token)
+                .body(new CmacVerifyRequest(uid, messageHex, incomingCmac))
+                .retrieve().body(VerifyResponse.class);
+        return response != null && response.valid();
+    }
+
     private record KeyImportRequest(String uid, String aes_key) {
     }
 
@@ -60,6 +72,9 @@ public class HsmClient {
     }
 
     private record NtagVerifyRequest(String uid, String counter_hex, String mac_input, String incoming_cmac) {
+    }
+
+    private record CmacVerifyRequest(String uid, String message_hex, String cmac) {
     }
 
     private record VerifyResponse(String uid, boolean valid) {

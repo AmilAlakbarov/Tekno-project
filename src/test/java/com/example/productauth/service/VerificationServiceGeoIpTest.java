@@ -72,6 +72,23 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
+    void verifiesJsonCmacThroughHsmWhenKeyIsNotStoredInApplicationDatabase() {
+        tag.setAesKey(null);
+        when(hsmClient.isConfigured()).thenReturn(true);
+        when(hsmClient.verifyCmac("04AABBCCDDEEFF", 1, request.cmac())).thenReturn(true);
+        when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.empty());
+        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.empty());
+
+        VerifyResponse response = service.verify(request, "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("REAL");
+        verify(hsmClient).verifyCmac("04AABBCCDDEEFF", 1, request.cmac());
+        verify(signatures, never()).matches("04AABBCCDDEEFF", 1, null, request.cmac());
+        assertThat(tag.getLastScanCounter()).isEqualTo(1);
+    }
+
+    @Test
     void comparesSubmittedCoordinatesToLatestRealScanAndDoesNotAdvanceCounterOnTravelAnomaly() {
         when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
         when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(location));

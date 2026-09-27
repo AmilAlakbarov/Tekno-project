@@ -87,6 +87,14 @@ def _aes_cmac(key: bytes, message: bytes) -> bytes:
     return signer.finalize()
 
 
+def _matches_cmac(key: bytes, message: bytes, provided: bytes) -> bool:
+    if len(provided) not in {8, 16}:
+        return False
+    calculated = _aes_cmac(key, message)
+    expected = calculated[:len(provided)]
+    return hmac.compare_digest(expected, provided)
+
+
 def _json_response(handler: BaseHTTPRequestHandler, status: HTTPStatus, payload: dict[str, Any]) -> None:
     encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
     handler.send_response(status)
@@ -204,7 +212,7 @@ class HsmHandler(BaseHTTPRequestHandler):
 
     def _verify_cmac(self, body: dict[str, Any]) -> None:
         uid = _hex_value(body.get("uid"), "uid", lengths=set(range(4, 17)))
-        provided = _hex_value(body.get("cmac"), "cmac", lengths={16})
+        provided = _hex_value(body.get("cmac"), "cmac", lengths={8, 16})
         message = _message(body)
         uid_text = uid.hex().upper()
         with _database() as connection:
@@ -212,7 +220,7 @@ class HsmHandler(BaseHTTPRequestHandler):
         if row is None:
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "unknown_uid"})
             return
-        valid = hmac.compare_digest(_aes_cmac(bytes(row[0]), message), provided)
+        valid = _matches_cmac(bytes(row[0]), message, provided)
         _json_response(self, HTTPStatus.OK, {"uid": uid_text, "valid": valid})
 
     def _verify_ntag424(self, body: dict[str, Any]) -> None:

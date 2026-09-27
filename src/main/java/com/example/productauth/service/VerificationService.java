@@ -67,7 +67,10 @@ public class VerificationService {
             return recordFailure(request, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
-        if (!signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac())) {
+        boolean signatureValid = hsmClient.isConfigured()
+                ? hsmClient.verifyCmac(uid, counter, request.cmac())
+                : signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac());
+        if (!signatureValid) {
             return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 

@@ -55,14 +55,19 @@ last seven UTC days.
 Run `python scripts\test-impossible-travel.py --uid <14-hex-characters>` from
 PowerShell. The helper reads the matching AES key from the local
 `tools\simulator\simulator_vault.json` file and defaults to the deployed API at
-`https://authentichain.website`; use `--vault`, `--backend-url`, or
-`--first-counter` to override those defaults. It never prints the AES key.
+`https://authentichain.website`. It starts with the next counter after the
+counter stored for that tag and saves the second scan's counter back to the
+vault, so repeated runs do not reuse locally generated counters. Use `--vault`,
+`--backend-url`, or `--first-counter` to override the defaults; an explicit
+counter must be greater than the vault's saved counter. It never prints the
+AES key.
 
 The helper submits successive valid JSON scans at Baku and London coordinates.
 The second scan should be flagged as `SPEED_ANOMALY` when the scans are close
 together in time. Use a newly provisioned tag with no prior successful scans so
-the Baku scan establishes the baseline; choose `--first-counter` above the
-tag's current accepted counter. The speed check uses submitted coordinates,
+the Baku scan establishes the baseline. If the backend has already accepted a
+higher counter than the local vault records, set `--first-counter` above the
+backend's current accepted counter. The speed check uses submitted coordinates,
 not request IP or GeoIP; those coordinates are not independently verified and
 must be treated as an advisory signal. Requests still store normal IP/GeoIP
 context when available.
@@ -154,6 +159,8 @@ In the dashboard, create a product and copy its product ID. Generate tags for
 that product with the simulator, export `provisioning_keys.csv`, then upload
 the CSV under **Provisioning**. The backend sends each key to the HSM when
 `HSM_BASE_URL` and `HSM_SERVICE_TOKEN` are configured.
+Both the JSON scanner CMAC and NTAG 424 SDM CMAC are then verified inside the
+HSM; AES keys remain outside the application database.
 
 Set the same secret `HSM_SERVICE_TOKEN` on the backend and HSM services. The
 HSM database configuration is provided by `HSM_DB_HOST`, `HSM_DB_PORT`,
