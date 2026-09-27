@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f7f2">
+    <meta name="description" content="AuthentiChain connects NTAG 424 DNA products to cryptographic verification, protected key handling, and a practical product identity dashboard.">
+    <title>AuthentiChain — Product identity you can verify</title>
+    <link rel="icon" type="image/svg+xml" href="./mark.svg">
+    <link rel="stylesheet" href="./styles.css">
+    <script src="./site.js" defer></script>
+  </head>
+  <body>
+    <a class="skip-link" href="#main">Skip to content</a>
+    <header class="site-header">
+      <a class="brand" href="#top" aria-label="AuthentiChain home">
+        <img src="./mark.svg" alt="">
+        <span>AUTHENTI<span class="brand-accent">CHAIN</span></span>
+      </a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav">Menu</button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <a href="#how">How it works</a>
+        <a href="#platform">Platform</a>
+        <a href="#roadmap">Roadmap</a>
+        <a class="nav-cta" href="https://admin.authentichain.website">Open dashboard <span aria-hidden="true">↗</span></a>
+        <div class="language-switcher" aria-label="Language">
+          <button type="button" class="language-button is-selected" data-language="en" aria-label="English">🇬🇧</button>
+          <button type="button" class="language-button" data-language="tr" aria-label="Türkçe">🇹🇷</button>
+          <button type="button" class="language-button" data-language="az" aria-label="Azərbaycan dili">🇦🇿</button>
+        </div>
+      </nav>
+    </header>
+
+    <main id="main">
+      <section class="hero section-shell" id="top">
+        <div class="hero-copy">
+          <div class="eyebrow"><span class="status-dot"></span> PRODUCT AUTHENTICATION · PROJECT OVERVIEW</div>
+          <h1>Give every product<br>an identity you can <em>verify.</em></h1>
+          <p class="hero-lede">AuthentiChain is a product-authentication project built around secure NFC tags. It checks each scan against the tag’s cryptographic signature and counter, then gives teams a place to manage products, tags, and verification events.</p>
+          <div class="hero-actions">
+            <a class="button button-primary" href="#how">Explore the system <span aria-hidden="true">↓</span></a>
+            <a class="button button-secondary" href="https://admin.authentichain.website">Admin dashboard <span aria-hidden="true">↗</span></a>
+          </div>
+          <p class="hero-note">Built for NTAG 424 DNA · No consumer account required to scan</p>
+        </div>
+        <div class="hero-visual" aria-label="Illustration of an NFC product verification flow">
+          <div class="orbit orbit-one"></div><div class="orbit orbit-two"></div>
+          <div class="data-node node-one">UID<span>04 A7 2C</span></div>
+          <div class="data-node node-two">CMAC<span>VALID</span></div>
+          <div class="data-node node-three">CTR<span>00 02 23</span></div>
+          <div class="signal-ring"></div>
+          <div class="tag-shadow"></div>
+          <div class="tag-depth tag-depth-back"></div>
+          <div class="tag-depth tag-depth-mid"></div>
+          <div class="hero-tag">
+            <div class="tag-top"><span class="tag-chip"><i></i><i></i><i></i><i></i></span><span class="tag-nfc">NFC / SDM</span></div>
+            <div class="tag-mark"><img src="./mark.svg" alt=""></div>
+            <div class="tag-label">AUTHENTICITY<br><strong>IN EVERY TAP</strong></div>
+            <div class="tag-bottom"><span>NTAG 424 DNA</span><span>01 / 01</span></div>
+          </div>
+          <div class="scan-beam"></div>
+          <div class="proof-card"><span class="proof-icon">✓</span><span><strong>Signature verified</strong><small>Counter accepted · Product matched</small></span><span class="proof-live">REAL</span></div>
+          <div class="visual-caption">A signed scan. A server-side decision.</div>
+        </div>
+        <div class="hero-index"><span>01</span><span class="index-line"></span><span>TRUST, MADE TANGIBLE</span></div>
+      </section>
+
+      <section class="trust-strip" aria-label="Project technology">
+        <div><span>TAG</span><strong>NTAG 424 DNA</strong></div>
+        <div><span>CRYPTOGRAPHY</span><strong>AES-CMAC verification</strong></div>
+        <div><span>KEY SERVICE</span><strong>Private HSM-style API</strong></div>
+        <div><span>OPERATIONS</span><strong>Live admin dashboard</strong></div>
+      </section>
+
+      <section class="section-shell story-section" id="why">
+        <div class="section-kicker">01 — THE IDEA</div>
+        <div class="story-grid">
+          <h2>Not just a label.<br><em>A cryptographic check.</em></h2>
+          <div class="story-copy">
+            <p>Ordinary QR codes and printed serial numbers can be copied. AuthentiChain explores a stronger approach: an NFC tag generates changing, signed scan data that a server can validate against a registered product and secret key.</p>
+            <p>The result is designed to help a brand or operator distinguish a valid tag response from a replay, altered signature, unknown tag, or revoked identity.</p>
+            <div class="callout"><span class="callout-mark">AC</span><span><strong>What the name means</strong><small>A connected chain of product identity and verification records—not a public blockchain.</small></span></div>
+          </div>
+        </div>
+        <div class="identity-visual" aria-label="Product identity connection diagram">
+          <span class="identity-node identity-tag"><b>NFC</b><small>physical tag</small></span>
+          <span class="identity-line line-one"></span><span class="identity-line line-two"></span>
+          <span class="identity-node identity-proof"><b>CMAC</b><small>signed proof</small></span>
+          <span class="identity-node identity-record"><b>RECORD</b><small>audit trail</small></span>
+          <span class="identity-core"><img src="./mark.svg" alt=""><b>IDENTITY</b></span>
+        </div>
+      </section>
+
+      <section class="how-section" id="how">
+        <div class="section-shell">
+          <div class="section-heading">
+            <div><div class="section-kicker">02 — THE SCAN</div><h2>From tap to decision<br>in a few steps.</h2></div>
+            <p>The tag supplies cryptographic evidence. AuthentiChain checks that evidence before returning a product result.</p>
+          </div>
+          <div class="steps">
+            <article class="step-card"><span class="step-number">01</span><div class="step-icon icon-nfc">⌁</div><h3>Tap the tag</h3><p>A phone or compatible NFC reader reads the tag’s secure dynamic message.</p><span class="step-tag">NFC · NTAG 424 DNA</span></article>
+            <article class="step-card"><span class="step-number">02</span><div class="step-icon icon-sign">⌘</div><h3>Check the proof</h3><p>The API checks the CMAC signature, tag status, and counter. Configured HSM service verifies without returning keys.</p><span class="step-tag">AES-CMAC · COUNTER</span></article>
+            <article class="step-card"><span class="step-number">03</span><div class="step-icon icon-record">▤</div><h3>Record the event</h3><p>The scan outcome is logged. A valid response can match the tag to its registered product.</p><span class="step-tag">AUDIT · PRODUCT MATCH</span></article>
+            <article class="step-card"><span class="step-number">04</span><div class="step-icon icon-view">◉</div><h3>Review and respond</h3><p>Authorized staff use the dashboard to review scans, investigate alerts, and manage tag status.</p><span class="step-tag">DASHBOARD · ROLE BASED</span></article>
+          </div>
+          <div class="result-band"><div><span class="result-check">✓</span><span><strong>REAL</strong><small>Valid cryptographic response</small></span></div><span class="result-divider"></span><div><span class="result-alert">!</span><span><strong>FLAGGED</strong><small>Replay, tamper, unknown, revoked, or suspicious</small></span></div><p>A scan result is a signal for the operator—not a guarantee about the physical item or its supply chain.</p></div>
+          <div class="scan-track" aria-hidden="true"><span class="track-device">TAP</span><i></i><span>READ</span><i></i><span>VERIFY</span><i></i><span class="track-result">DECIDE</span></div>
+        </div>
+      </section>
+
+      <section class="section-shell platform-section" id="platform">
+        <div class="section-heading">
+          <div><div class="section-kicker">03 — THE PLATFORM</div><h2>The pieces behind<br>the product identity.</h2></div>
+          <p>A working end-to-end project with clear boundaries between scanning, verification, key handling, and operations.</p>
+        </div>
+        <div class="platform-grid">
+          <article class="platform-card platform-main">
+            <div class="card-index">A / VERIFY</div><div class="platform-symbol">01</div>
+            <h3>Verification API</h3><p>Java 21 and Spring Boot validate tag messages, enforce counters, and return an outcome. PostgreSQL stores registered identities and scan history.</p>
+            <div class="tech-row"><span>SPRING BOOT</span><span>POSTGRESQL</span><span>FLYWAY</span></div>
+          </article>
+          <article class="platform-card">
+            <div class="card-index">B / PROTECT</div><div class="platform-symbol key-symbol">⌑</div>
+            <h3>Key-service boundary</h3><p>A separate authenticated HSM-style service stores AES keys and supports cryptographic verification. Inventory exposes metadata, not the keys.</p>
+            <div class="tech-row"><span>PYTHON SERVICE</span><span>AUTHENTICATED API</span></div>
+          </article>
+          <article class="platform-card">
+            <div class="card-index">C / OPERATE</div><div class="platform-symbol screen-symbol">▱</div>
+            <h3>Admin control center</h3><p>Manage products, provisioning, tag status, accounts, and scan evidence with administrator, operator, and viewer roles.</p>
+            <div class="tech-row"><span>REACT</span><span>SESSION + CSRF</span></div>
+          </article>
+          <article class="platform-card">
+            <div class="card-index">D / SIMULATE</div><div class="platform-symbol sim-symbol">⌘</div>
+            <h3>Developer simulator</h3><p>Generate virtual tag records, export provisioning CSVs, and create signed test URLs for development and demos.</p>
+            <div class="tech-row"><span>PYTHON</span><span>DEVELOPMENT ONLY</span></div>
+          </article>
+        </div>
+        <div class="architecture-note"><span class="architecture-pulse"></span><span><strong>Current deployment model</strong> — web services and PostgreSQL configured for Render. Development simulator and HSM-like service are not certified hardware security modules.</span></div>
+        <div class="architecture-visual" aria-label="AuthentiChain platform architecture">
+          <span class="arch-layer layer-reader">NFC READER <b>→</b></span>
+          <span class="arch-layer layer-api">VERIFICATION API <b>→</b></span>
+          <span class="arch-layer layer-key">KEY SERVICE <b>→</b></span>
+          <span class="arch-layer layer-db">AUDIT DATABASE</span>
+        </div>
+      </section>
+
+      <section class="console-section">
+        <div class="section-shell console-layout">
+          <div class="console-copy">
+            <div class="section-kicker">03.5 — THE PROOF CONSOLE</div>
+            <h2>Turn one tap into<br><em>visible evidence.</em></h2>
+            <p>Every decision has a trail: the product identity, counter state, verification result, and the signals an operator may need to review.</p>
+            <div class="console-metrics"><span><strong>99.2%</strong><small>verified in sample</small></span><span><strong>2.4k</strong><small>events recorded</small></span><span><strong>0</strong><small>keys exposed</small></span></div>
+          </div>
+          <div class="proof-console" aria-label="Illustrated verification console">
+            <div class="console-top"><span class="console-brand"><i></i> AUTHENTICHAIN / LIVE</span><span class="console-time">09:41:08 UTC</span></div>
+            <div class="console-body">
+              <div class="console-ring"><div class="console-ring-core">✓<small>REAL</small></div></div>
+              <div class="console-details"><span class="console-label">VERIFICATION DECISION</span><strong>Signature accepted</strong><p>Product matched to registered identity.</p><div class="console-code"><span>UID</span><b>04 A7 2C 91</b><span>CTR</span><b>00 02 23</b><span>CMAC</span><b class="lime-text">VALID</b></div></div>
+            </div>
+            <div class="console-footer"><span><i class="mini-dot"></i> API RESPONSE 200</span><span>COUNTER INCREMENTED ↗</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="security-section">
+        <div class="section-shell security-layout">
+          <div class="security-intro"><div class="section-kicker">04 — DEFENSE IN DEPTH</div><h2>Look for signals.<br>Keep the limits visible.</h2><p>Multiple checks make suspicious activity easier to spot. No single scan or location signal proves that a physical product is genuine.</p><a href="#limits" class="text-link">Read the limitations <span aria-hidden="true">↓</span></a></div>
+          <div class="defense-list">
+            <div><span class="defense-icon">01</span><span><strong>Signed message validation</strong><small>Rejects invalid cryptographic proofs.</small></span><b>CORE</b></div>
+            <div><span class="defense-icon">02</span><span><strong>Counter and replay checks</strong><small>Flags reused or out-of-sequence scan counters.</small></span><b>CORE</b></div>
+            <div><span class="defense-icon">03</span><span><strong>Tag status enforcement</strong><small>Revoked tags no longer pass as active identities.</small></span><b>CORE</b></div>
+            <div><span class="defense-icon">04</span><span><strong>Operational safeguards</strong><small>Session-based admin access, roles, CSRF controls, and event history.</small></span><b>ADMIN</b></div>
+            <div><span class="defense-icon">05</span><span><strong>Location as context</strong><small>Optional approximate IP context and user-shared GPS; never a cryptographic proof.</small></span><b>ADVISORY</b></div>
+          </div>
+          <div class="shield-visual" aria-hidden="true"><div class="shield-ring"></div><div class="shield-core"><span>✓</span><small>DEFENDED</small></div><i class="shield-pip pip-one"></i><i class="shield-pip pip-two"></i><i class="shield-pip pip-three"></i></div>
+        </div>
+      </section>
+
+      <section class="section-shell limits-section" id="limits">
+        <div class="section-kicker">05 — HONEST BY DESIGN</div>
+        <div class="limits-grid">
+          <div><h2>What a scan can—and can’t—tell you.</h2><p>Cryptography can show that a tag produced valid scan data for a registered key. It cannot by itself prove who scanned it, where they are, or that the tagged item has not been physically moved or copied.</p></div>
+          <ul>
+            <li><span>IP GeoIP</span><span>Approximate network location; mobile networks, VPNs, and proxies can make it misleading.</span></li>
+            <li><span>Device GPS</span><span>Optional and permission-based; may be denied, inaccurate, or spoofed.</span></li>
+            <li><span>Simulator / HSM</span><span>Software demonstration components; not certified hardware security.</span></li>
+            <li><span>Fraud signals</span><span>Useful for human review; avoid blocking solely on a location estimate.</span></li>
+          </ul>
+          <div class="signal-visual" aria-label="Illustration showing approximate and verified signals"><span class="signal-label label-ip">IP · APPROXIMATE</span><span class="signal-label label-gps">GPS · OPTIONAL</span><span class="signal-label label-crypto">CRYPTO · VERIFIED</span><div class="signal-bars"><i></i><i></i><i></i><i></i><i></i></div></div>
+        </div>
+      </section>
+
+      <section class="roadmap-section" id="roadmap">
+        <div class="section-shell">
+          <div class="section-heading">
+            <div><div class="section-kicker">06 — WHAT’S NEXT</div><h2>A practical path<br>from demo to deployment.</h2></div>
+            <p>These are candidate next steps, not commitments or features currently delivered. Priorities depend on product and deployment requirements.</p>
+          </div>
+          <div class="roadmap-grid">
+            <article><span class="roadmap-status status-now">NEXT CANDIDATE</span><h3>Connect the physical reader</h3><p>Harden the Arduino Uno + PN532 scanning flow, with OLED feedback and the Nano SD-card / speaker companion.</p><small>HARDWARE · SERIAL PROTOCOL · OFFLINE BEHAVIOR</small></article>
+            <article><span class="roadmap-status status-next">PLANNED DIRECTION</span><h3>Strengthen location evidence</h3><p>Separate approximate GeoIP from consented device location, show uncertainty clearly, and retain only what operations need.</p><small>PRIVACY · ACCURACY · RETENTION</small></article>
+            <article><span class="roadmap-status status-later">FUTURE OPTION</span><h3>Prepare for real operations</h3><p>Evaluate a certified HSM, key rotation and recovery, production monitoring, backup strategy, and independent security review.</p><small>KEY LIFECYCLE · RESILIENCE · ASSURANCE</small></article>
+          </div>
+          <div class="roadmap-line" aria-hidden="true"><span class="done"></span><span class="active"></span><span></span><b>NOW</b><b>NEXT</b><b>FUTURE</b></div>
+        </div>
+      </section>
+
+      <section class="section-shell audience-section">
+        <div class="audience-card"><div><div class="section-kicker">BUILT TO BE UNDERSTOOD</div><h2>For teams that make,<br>move, and verify goods.</h2><p>Designed as a demonstrable foundation for brands, product teams, and integrators exploring secure NFC identity.</p></div><div class="audience-visual"><div class="audience-orbit"></div><img src="./mark.svg" alt=""></div><div class="audience-pills"><span>BRANDS</span><span>OPERATIONS</span><span>INTEGRATORS</span><span>DEVELOPERS</span></div></div>
+      </section>
+
+      <section class="closing-section">
+        <div class="closing-inner"><div class="closing-mark"><img src="./mark.svg" alt=""></div><div class="section-kicker">AUTHENTICHAIN · PRODUCT IDENTITY PROJECT</div><h2>Start with a tap.<br>Build toward trust.</h2><p>Explore the control center or review the project’s technical documentation.</p><div class="hero-actions"><a class="button button-primary" href="https://admin.authentichain.website">Open the dashboard <span aria-hidden="true">↗</span></a><a class="button button-light" href="https://github.com/AmilAlakbarov/Tekno-project">Project on GitHub <span aria-hidden="true">↗</span></a></div></div>
+      </section>
+    </main>
+
+    <footer class="site-footer"><a class="brand footer-brand" href="#top"><img src="./mark.svg" alt=""><span>AUTHENTI<span class="brand-accent">CHAIN</span></span></a><p>Product identity you can verify.</p><span class="footer-disclaimer">Project demonstration · Not a certification or guarantee of product authenticity</span><a href="#top" class="back-top">Back to top ↑</a></footer>
+  </body>
+</html>

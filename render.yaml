@@ -50,6 +50,12 @@ services:
       - key: VITE_API_URL
         value: https://authentichain.website
   - type: web
+    name: authentichain-product-site
+    runtime: static
+    rootDir: product-site
+    buildCommand: echo "Publishing AuthentiChain product site"
+    staticPublishPath: .
+  - type: web
     name: authentichain-hsm
     runtime: python
     plan: free

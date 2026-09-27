@@ -11,6 +11,7 @@ security events.
 - PostgreSQL and Flyway for application data and schema migrations
 - A Python HSM-like service for private AES-key storage and CMAC verification
 - React and Vite for the admin dashboard
+- A separate static product website in `product-site/`
 - Docker and Render configuration for deployment
 - A Python virtual-tag simulator for development and demonstrations
 
@@ -46,6 +47,15 @@ dashboard browser to OpenStreetMap and disclose the requested map area and
 browser IP to the tile provider; scan IPs are still resolved locally. The
 overview activity chart reports daily verified and flagged scan counts for the
 last seven UTC days.
+
+## Public product website
+
+`product-site/` contains the public-facing AuthentiChain overview, separate
+from the React admin dashboard. The Render blueprint defines it as the static
+site `authentichain-product-site`; syncing `render.yaml` creates the additional
+service. It can use the Render-provided `onrender.com` address or a custom
+domain configured in Render. The roadmap on the site is explicitly labeled as
+future direction rather than shipped functionality.
 
 ## Local development
 
