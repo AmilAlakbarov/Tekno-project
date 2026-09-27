@@ -8,7 +8,7 @@ import './styles.css'
 const navItems = [
   { id: 'home', label: 'Overview', icon: '⌂' },
   { id: 'tags', label: 'Tag registry', icon: '⌁' },
-  { id: 'provisioning', label: 'Provisioning', icon: '+' },
+  { id: 'provisioning', label: 'Provisioning', icon: '+', operatorOnly: true },
   { id: 'security', label: 'Security events', icon: '◈' },
   { id: 'accounts', label: 'Accounts', icon: '◎', adminOnly: true }
 ]
@@ -67,14 +67,16 @@ function App() {
     window.location.hash = next
     setMobileNav(false)
   }
+  const canManage = user.role === 'ADMIN' || user.role === 'OPERATOR'
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${user.role === 'VIEWER' ? 'viewer-shell' : ''}`}>
       <aside className={`sidebar ${mobileNav ? 'sidebar-open' : ''}`}>
         <div className="brand"><img src="/authentichain-mark.svg" alt="" /><span>AUTHENTI<span>CHAIN</span></span></div>
         <div className="workspace-label">CONTROL CENTER</div>
         <nav>
-          {navItems.filter((item) => !item.adminOnly || user.role === 'ADMIN').map((item) => (
+          {navItems.filter((item) => (!item.adminOnly || user.role === 'ADMIN')
+            && (!item.operatorOnly || canManage)).map((item) => (
             <button className={`nav-item ${page === item.id ? 'active' : ''}`} key={item.id} onClick={() => navigate(item.id)}>
               <span className="nav-icon">{item.icon}</span>{item.label}
             </button>
@@ -90,10 +92,10 @@ function App() {
         <header className="topbar">
           <button className="menu-button" onClick={() => setMobileNav(true)} aria-label="Open navigation">☰</button>
           <div><div className="eyebrow">ADMINISTRATION</div><h1>{navItems.find((item) => item.id === page)?.label || 'Overview'}</h1></div>
-          <div className="topbar-meta"><span className="live-pill"><span className="status-dot" /> LIVE</span><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><button className="text-button" onClick={() => authApi.logout().then(() => setUser(null))}>Log out</button></div>
+          <div className="topbar-meta"><span className="user-role">{user.role === 'VIEWER' ? 'VISITOR · READ ONLY' : user.role}</span><span className="live-pill"><span className="status-dot" /> LIVE</span><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><button className="text-button" onClick={() => authApi.logout().then(() => setUser(null))}>Log out</button></div>
         </header>
         <div className="page-content">
-          {page === 'tags' ? <TagsPage /> : page === 'provisioning' ? <ProvisioningPage /> : page === 'security' ? <SecurityPage /> : page === 'accounts' && user.role === 'ADMIN' ? <AccountsPage user={user} /> : <HomePage navigate={navigate} />}
+          {page === 'tags' ? <TagsPage readOnly={!canManage} /> : page === 'provisioning' && canManage ? <ProvisioningPage /> : page === 'security' ? <SecurityPage /> : page === 'accounts' && user.role === 'ADMIN' ? <AccountsPage user={user} /> : <HomePage navigate={navigate} />}
         </div>
       </main>
     </div>
@@ -238,7 +240,7 @@ function MapAutoFit({ locations }) {
 function ScanTable({ rows, security = false }) {
   if (!rows.length) return <div className="empty-state">No scan activity recorded yet.</div>
   const visibleRows = uniqueScans(rows)
-  return <div className="table-wrap"><table><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR</th><th>NEXT ACCEPTED CTR</th>{security && <><th>LOCATION EVIDENCE</th><th>IP</th></>}</tr></thead><tbody>{visibleRows.map((row, index) => {
+  return <div className="table-wrap"><table className="scan-table"><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR</th><th>NEXT ACCEPTED CTR</th>{security && <><th>LOCATION EVIDENCE</th><th>IP</th></>}</tr></thead><tbody>{visibleRows.map((row, index) => {
     const geoPlace = [row.geoCity, row.geoRegion, row.geoCountry].filter(Boolean).join(', ')
     const geoCoordinates = row.geoLatitude != null && row.geoLongitude != null
       ? `${Number(row.geoLatitude).toFixed(3)}, ${Number(row.geoLongitude).toFixed(3)}`
@@ -253,11 +255,11 @@ function ScanTable({ rows, security = false }) {
       : row.latitude != null && row.longitude != null
         ? `Client-supplied coordinates (untrusted): ${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}`
         : 'No GeoIP location'
-    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td><code>{row.uid || '—'}</code></td><td><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td>{row.receivedCounter ?? '—'}</td><td>{row.expectedCounter ?? '—'}</td>{security && <><td>{locationEvidence}</td><td><code>{row.ipAddress || '—'}</code></td></>}</tr>
+    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td data-label="TAG UID"><code>{row.uid || '—'}</code></td><td data-label="TIME"><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td data-label="RESULT"><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td data-label="RECEIVED CTR">{row.receivedCounter ?? '—'}</td><td data-label="NEXT ACCEPTED CTR">{row.expectedCounter ?? '—'}</td>{security && <><td data-label="LOCATION">{locationEvidence}</td><td data-label="IP"><code>{row.ipAddress || '—'}</code></td></>}</tr>
   })}</tbody></table></div>
 }
 
-function TagsPage() {
+function TagsPage({ readOnly = false }) {
   const [tags, setTags] = useState([])
   const [products, setProducts] = useState([])
   const [filters, setFilters] = useState({ q: '', productId: '', manufacturer: '', status: '' })
@@ -393,19 +395,19 @@ function TagsPage() {
         <label className="filter-field"><span>Status</span><select value={filters.status} onChange={(event) => setFilter('status', event.target.value)}><option value="">All statuses</option><option value="ACTIVE">Active</option><option value="REVOKED">Revoked</option></select></label>
         <button className="outline-button" onClick={refresh} disabled={loading || processing}>↻ Refresh</button>
       </div>
-      <div className="bulk-toolbar">
+      {!readOnly && <div className="bulk-toolbar">
         <span className="muted">{selected.size} selected</span>
         <div className="bulk-actions">
           <button className="outline-button" disabled={!selected.size || processing} onClick={() => runBulkAction('ACTIVATE')}>Activate</button>
           <button className="danger-button" disabled={!selected.size || processing} onClick={() => runBulkAction('REVOKE')}>Revoke</button>
           <button className="danger-button" disabled={!selected.size || processing} onClick={() => runBulkAction('DELETE')}>Delete</button>
         </div>
-      </div>
-      {loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table><thead><tr><th><input type="checkbox" aria-label="Select all tags on this page" checked={selectedAllOnPage} onChange={(event) => togglePageSelection(event.target.checked)} /></th><th>TAG UID</th><th>PRODUCT</th><th>MANUFACTURER</th><th>LAST COUNTER</th><th>STATUS</th><th /></tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}>
-        <td><input type="checkbox" aria-label={`Select tag ${tag.uid}`} checked={selected.has(tag.uid)} onChange={(event) => setSelected((current) => { const next = new Set(current); event.target.checked ? next.add(tag.uid) : next.delete(tag.uid); return next })} /></td>
-        <td><code>{tag.uid}</code></td><td><strong>{tag.displayName || tag.productName || products.find((product) => product.id === tag.productId)?.name || 'Unassigned'}</strong>{tag.description && <small className="table-subtitle">{tag.description}</small>}</td>
-        <td>{tag.manufacturer || products.find((product) => product.id === tag.productId)?.manufacturer || '—'}</td><td>{number(tag.lastScanCounter)}</td><td><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td>
-        <td className="actions"><button className="outline-button" disabled={processing} onClick={() => setEditing({ ...tag })}>Edit</button>{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}<button className="danger-button" disabled={processing} onClick={() => removeTag(tag.uid)}>Delete</button></td>
+      </div>}
+      {loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table className="tag-table"><thead><tr>{!readOnly && <th><input type="checkbox" aria-label="Select all tags on this page" checked={selectedAllOnPage} onChange={(event) => togglePageSelection(event.target.checked)} /></th>}<th>TAG UID</th><th>PRODUCT</th><th>MANUFACTURER</th><th>LAST COUNTER</th><th>STATUS</th>{!readOnly && <th />}</tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}>
+        {!readOnly && <td><input type="checkbox" aria-label={`Select tag ${tag.uid}`} checked={selected.has(tag.uid)} onChange={(event) => setSelected((current) => { const next = new Set(current); event.target.checked ? next.add(tag.uid) : next.delete(tag.uid); return next })} /></td>}
+        <td data-label="TAG UID"><code>{tag.uid}</code></td><td data-label="PRODUCT"><strong>{tag.displayName || tag.productName || products.find((product) => product.id === tag.productId)?.name || 'Unassigned'}</strong>{tag.description && <small className="table-subtitle">{tag.description}</small>}</td>
+        <td data-label="MANUFACTURER">{tag.manufacturer || products.find((product) => product.id === tag.productId)?.manufacturer || '—'}</td><td data-label="LAST COUNTER">{number(tag.lastScanCounter)}</td><td data-label="STATUS"><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td>
+        {!readOnly && <td className="actions"><button className="outline-button" disabled={processing} onClick={() => setEditing({ ...tag })}>Edit</button>{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}<button className="danger-button" disabled={processing} onClick={() => removeTag(tag.uid)}>Delete</button></td>}
       </tr>)}</tbody></table>{tags.length === 0 && <div className="empty-state">No tags match these filters.</div>}</div>}
       <div className="pagination"><span className="muted">Page {pageIndex + 1} of {totalPages}</span><div><button className="outline-button" disabled={pageIndex === 0 || loading} onClick={() => { setSelected(new Set()); setPageIndex((current) => Math.max(0, current - 1)) }}>Previous</button><button className="outline-button" disabled={pageIndex + 1 >= totalPages || loading} onClick={() => { setSelected(new Set()); setPageIndex((current) => current + 1) }}>Next</button></div></div>
     </section>

@@ -72,12 +72,12 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
-    void comparesGeoIpToLatestRealScanAndDoesNotAdvanceCounterOnTravelAnomaly() {
+    void comparesSubmittedCoordinatesToLatestRealScanAndDoesNotAdvanceCounterOnTravelAnomaly() {
         when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
         when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(location));
         ScanLog previous = mock(ScanLog.class);
-        when(previous.getGeoLatitude()).thenReturn(-40.0);
-        when(previous.getGeoLongitude()).thenReturn(-50.0);
+        when(previous.getLatitude()).thenReturn(-40.0);
+        when(previous.getLongitude()).thenReturn(-50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
         when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
                 "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
@@ -124,12 +124,33 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
-    void doesNotUseClientCoordinatesForTravelWhenGeoIpIsUnavailable() {
+    void comparesSubmittedCoordinatesForTravelWhenGeoIpIsUnavailable() {
         when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
         when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.empty());
         ScanLog previous = mock(ScanLog.class);
-        when(previous.getGeoLatitude()).thenReturn(-40.0);
-        when(previous.getGeoLongitude()).thenReturn(-50.0);
+        when(previous.getLatitude()).thenReturn(-40.0);
+        when(previous.getLongitude()).thenReturn(-50.0);
+        when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
+        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+
+        VerifyResponse response = service.verify(request, "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.SPEED_ANOMALY);
+        assertThat(capturedScanLog().getLatitude()).isEqualTo(40.0);
+        assertThat(capturedScanLog().getGeoLatitude()).isNull();
+        assertThat(tag.getLastScanCounter()).isZero();
+    }
+
+    @Test
+    void usesSubmittedCoordinatesInsteadOfGeoIpForTravelDecision() {
+        when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
+        when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(
+                new GeoIpLocation("Country", "CC", "Region", "City", -40.0, -50.0)));
+        ScanLog previous = mock(ScanLog.class);
+        when(previous.getLatitude()).thenReturn(40.0);
+        when(previous.getLongitude()).thenReturn(50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
         when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
                 "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
@@ -137,9 +158,44 @@ class VerificationServiceGeoIpTest {
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
         assertThat(response.status()).isEqualTo("REAL");
-        assertThat(capturedScanLog().getLatitude()).isEqualTo(40.0);
-        assertThat(capturedScanLog().getGeoLatitude()).isNull();
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.REAL);
         assertThat(tag.getLastScanCounter()).isEqualTo(1);
+    }
+
+    @Test
+    void prefersPreviouslySharedDeviceGpsOverThatScansSubmittedCoordinates() {
+        when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
+        ScanLog previous = mock(ScanLog.class);
+        when(previous.getLatitude()).thenReturn(40.0);
+        when(previous.getLongitude()).thenReturn(50.0);
+        when(previous.getDeviceLatitude()).thenReturn(-40.0);
+        when(previous.getDeviceLongitude()).thenReturn(-50.0);
+        when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
+        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+
+        VerifyResponse response = service.verify(request, "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.SPEED_ANOMALY);
+        assertThat(tag.getLastScanCounter()).isZero();
+    }
+
+    @Test
+    void publicNfcVerificationDoesNotUseGeoIpForImpossibleTravel() {
+        when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "000001", "mac-input",
+                "0011223344556677", tag.getAesKey())).thenReturn(true);
+        when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(
+                new GeoIpLocation("Country", "CC", "Region", "City", -40.0, -50.0)));
+
+        VerifyResponse response = service.verifySdm(
+                "04AABBCCDDEEFF", "000001", "0011223344556677", "mac-input", "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("REAL");
+        assertThat(capturedScanLog().getGeoLatitude()).isEqualTo(-40.0);
+        assertThat(tag.getLastScanCounter()).isEqualTo(1);
+        verify(logs, never()).findTopByTagUidAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", ScanResult.REAL);
     }
 
     @Test

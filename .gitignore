@@ -12,4 +12,5 @@ tools/simulator/provisioning_manifest.json
 tools/simulator/provisioning_keys.csv
 tools/simulator/.venv/
 scripts/*
+!scripts/test-impossible-travel.py
 Ignore/*

@@ -24,7 +24,7 @@ public class ScanLog {
     @Column(name = "scanned_at", nullable = false)
     private Instant scannedAt;
 
-    // These are JSON scanner-submitted coordinates, not trusted GeoIP evidence.
+    // Client-submitted coordinates are an advisory travel signal, not verified GPS proof.
     private Double latitude;
 
     private Double longitude;

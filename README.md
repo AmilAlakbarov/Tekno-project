@@ -29,12 +29,14 @@ hardware security modules. Do not use demo keys for real products.
 - Source-IP recording and optional local MaxMind GeoLite2 City enrichment for
   successfully verified scans; client IPs are never sent to a lookup service
 
-Impossible-travel detection uses locally resolved GeoIP coordinates and compares
-only with the latest successful scan. If the latest/current scan has no GeoIP
-coordinates, that location anomaly cannot be checked. JSON scanner coordinates
-remain recorded as explicitly untrusted client-provided evidence and are never
-used as an authoritative travel baseline. Public NFC URLs obtain location from
-the source IP when GeoIP is configured.
+Impossible-travel detection compares the latitude and longitude submitted with
+each successful JSON verification against the latest successful scan. When
+available, a previously shared device location is preferred for the prior
+scan; otherwise its submitted coordinates are used. This is user-provided
+location evidence: it may be inaccurate or spoofed and is an advisory fraud
+signal, not proof of physical location. GeoIP remains separate contextual
+evidence and does not drive the travel-speed decision. Public NFC URL scans do
+not include coordinates, so they cannot contribute a location to this check.
 
 The dashboard overview map uses OpenStreetMap tiles and plots up to 100 recent
 verified scan locations, preferring user-shared device GPS when available and
@@ -47,6 +49,23 @@ dashboard browser to OpenStreetMap and disclose the requested map area and
 browser IP to the tile provider; scan IPs are still resolved locally. The
 overview activity chart reports daily verified and flagged scan counts for the
 last seven UTC days.
+
+### Impossible-travel test helper
+
+Run `python scripts\test-impossible-travel.py --uid <14-hex-characters>` from
+PowerShell. The helper reads the matching AES key from the local
+`tools\simulator\simulator_vault.json` file and defaults to the deployed API at
+`https://authentichain.website`; use `--vault`, `--backend-url`, or
+`--first-counter` to override those defaults. It never prints the AES key.
+
+The helper submits successive valid JSON scans at Baku and London coordinates.
+The second scan should be flagged as `SPEED_ANOMALY` when the scans are close
+together in time. Use a newly provisioned tag with no prior successful scans so
+the Baku scan establishes the baseline; choose `--first-counter` above the
+tag's current accepted counter. The speed check uses submitted coordinates,
+not request IP or GeoIP; those coordinates are not independently verified and
+must be treated as an advisory signal. Requests still store normal IP/GeoIP
+context when available.
 
 ## Public product website
 

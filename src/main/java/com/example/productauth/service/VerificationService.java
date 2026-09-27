@@ -72,7 +72,7 @@ public class VerificationService {
         }
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
-        if (hasTravelAnomaly(uid, geoLocation)) {
+        if (hasTravelAnomaly(uid, request.latitude(), request.longitude())) {
             return recordFailure(request, ipAddress, ScanResult.SPEED_ANOMALY, tag,
                     "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
         }
@@ -133,11 +133,6 @@ public class VerificationService {
         }
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
-        if (hasTravelAnomaly(normalizedUid, geoLocation)) {
-            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
-                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
-        }
-
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
         saveSuccessfulLog(normalizedUid, null, null, ipAddress, counter, counter + 1,
@@ -199,12 +194,7 @@ public class VerificationService {
                 receivedCounter, expectedCounter));
     }
 
-    private boolean hasTravelAnomaly(String uid, Optional<GeoIpLocation> currentLocation) {
-        if (currentLocation.isEmpty()) {
-            log.info("Travel anomaly check skipped: verified scan has no GeoIP coordinates.");
-            return false;
-        }
-
+    private boolean hasTravelAnomaly(String uid, double latitude, double longitude) {
         Optional<ScanLog> previousOptional = scanLogRepository
                 .findTopByTagUidAndScanResultOrderByScannedAtDesc(uid, ScanResult.REAL);
         if (previousOptional.isEmpty()) {
@@ -212,18 +202,18 @@ public class VerificationService {
         }
 
         ScanLog previous = previousOptional.get();
-        if (previous.getGeoLatitude() == null || previous.getGeoLongitude() == null) {
-            log.info("Travel anomaly check skipped: latest successful scan has no GeoIP coordinates.");
+        Double previousLatitude = previous.getDeviceLatitude() != null
+                ? previous.getDeviceLatitude()
+                : previous.getLatitude();
+        Double previousLongitude = previous.getDeviceLongitude() != null
+                ? previous.getDeviceLongitude()
+                : previous.getLongitude();
+        if (previousLatitude == null || previousLongitude == null) {
+            log.info("Travel anomaly check skipped: latest successful scan has no submitted coordinates.");
             return false;
         }
 
-        GeoIpLocation location = currentLocation.get();
-        if (location.latitude() == null || location.longitude() == null) {
-            log.info("Travel anomaly check skipped: GeoIP location has no coordinates.");
-            return false;
-        }
-        double distanceKm = haversineKm(previous.getGeoLatitude(), previous.getGeoLongitude(),
-                location.latitude(), location.longitude());
+        double distanceKm = haversineKm(previousLatitude, previousLongitude, latitude, longitude);
         long elapsedSeconds = Duration.between(previous.getScannedAt(), java.time.Instant.now()).getSeconds();
         if (elapsedSeconds <= 0) {
             return distanceKm > 0.001;
