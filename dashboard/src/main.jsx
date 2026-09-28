@@ -242,7 +242,7 @@ function MapAutoFit({ locations }) {
 
 function ScanTable({ rows, security = false }) {
   if (!rows.length) return <div className="empty-state">No scan activity recorded yet.</div>
-  const visibleRows = uniqueScans(rows)
+  const visibleRows = security ? rows : uniqueScans(rows)
   return <div className="table-wrap"><table className="scan-table"><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR (HEX)</th><th>NEXT ACCEPTED CTR (HEX)</th>{security && <><th>LOCATION EVIDENCE</th><th>IP</th></>}</tr></thead><tbody>{visibleRows.map((row, index) => {
     const geoPlace = [row.geoCity, row.geoRegion, row.geoCountry].filter(Boolean).join(', ')
     const geoCoordinates = row.geoLatitude != null && row.geoLongitude != null
@@ -431,8 +431,7 @@ function SecurityPage() {
     } catch { setError('Could not load security events.') }
   }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
-  const flagged = useMemo(() => events.filter((event) => !['REAL', 'VALID', 'SUCCESS'].includes(String(event.result).toUpperCase())), [events])
-  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><span className="refresh-label">Auto-refreshes every 15s</span></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{uniqueScans(events).length} flagged events</strong><span>Unique UID/counter events</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={uniqueScans(events)} security /></section><section className="panel"><div className="panel-heading"><div><h2>Verified scan location evidence</h2><span className="muted">GeoIP evidence is derived locally from IP addresses; client-supplied coordinates are untrusted.</span></div></div><ScanTable rows={verifiedScans} security /></section></div>
+  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><span className="refresh-label">Auto-refreshes every 15s</span></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{events.length} recorded events</strong><span>Each stored scan-log event</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={events} security /></section><section className="panel"><div className="panel-heading"><div><h2>Verified scan location evidence</h2><span className="muted">GeoIP evidence is derived locally from IP addresses; client-supplied coordinates are untrusted.</span></div></div><ScanTable rows={verifiedScans} security /></section></div>
 }
 
 function ProvisioningPage() {
