@@ -24,11 +24,8 @@ import com.example.productauth.service.VerificationService;
 import jakarta.servlet.http.HttpServletRequest;
 
 import java.time.Instant;
-import java.util.Arrays;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/nfc")
@@ -38,29 +35,17 @@ public class NfcScanController {
     private static final Logger log = LoggerFactory.getLogger(NfcScanController.class);
     private final VerificationService verificationService;
     private final String publicBaseUrl;
-    private final Set<String> blockedSourceIps;
 
     public NfcScanController(VerificationService verificationService,
-            @Value("${app.public-base-url:}") String publicBaseUrl,
-            @Value("${app.nfc.blocked-source-ips:}") String blockedSourceIps) {
+            @Value("${app.public-base-url:}") String publicBaseUrl) {
         this.verificationService = verificationService;
         this.publicBaseUrl = publicBaseUrl;
-        this.blockedSourceIps = Arrays.stream(blockedSourceIps.split(","))
-                .map(String::trim)
-                .filter(ip -> !ip.isEmpty())
-                .collect(Collectors.toUnmodifiableSet());
     }
 
     @GetMapping(path = {"", "/v1/verify"}, produces = MediaType.TEXT_HTML_VALUE)
     public ResponseEntity<String> receiveNfcMessage(
             @RequestParam Map<String, String> parameters, HttpServletRequest request) {
         log.info("NFC SDM request received: parameters={}", parameters.keySet());
-        if (blockedSourceIps.contains(clientIp(request))) {
-            log.info("Rejected NFC verification request from a blocked source IP.");
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .contentType(MediaType.TEXT_HTML)
-                    .body(page("BLOCKED", "This request source is not permitted.", null, null, null, null).getBody());
-        }
 
         String uid = parameters.get("uid");
         String counter = parameters.get("ctr");

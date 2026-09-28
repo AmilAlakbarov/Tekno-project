@@ -12,12 +12,16 @@ import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ScanLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
+import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
 public class VerificationService {
@@ -32,16 +36,23 @@ public class VerificationService {
     private final SignatureVerificationService signatureVerificationService;
     private final HsmClient hsmClient;
     private final GeoIpService geoIpService;
+    private final Set<String> replayLogSuppressedSourceIps;
 
     public VerificationService(NfcTagRepository nfcTagRepository,
             ScanLogRepository scanLogRepository,
             SignatureVerificationService signatureVerificationService, HsmClient hsmClient,
-            GeoIpService geoIpService) {
+            GeoIpService geoIpService,
+            @Value("${app.nfc.replay-log-suppressed-source-ips:}") String replayLogSuppressedSourceIps) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
         this.signatureVerificationService = signatureVerificationService;
         this.hsmClient = hsmClient;
         this.geoIpService = geoIpService;
+        this.replayLogSuppressedSourceIps = Arrays.stream(replayLogSuppressedSourceIps.split(","))
+                .map(String::trim)
+                .map(ip -> ip.toLowerCase(Locale.ROOT))
+                .filter(ip -> !ip.isEmpty())
+                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Transactional
@@ -189,6 +200,11 @@ public class VerificationService {
 
     private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
             ScanResult result, Integer receivedCounter, Integer expectedCounter) {
+        if (result == ScanResult.REPLAY_ATTACK && ipAddress != null
+                && replayLogSuppressedSourceIps.contains(ipAddress.trim().toLowerCase(Locale.ROOT))) {
+            log.info("Replay attempt rejected; scan log suppressed for a configured source IP.");
+            return null;
+        }
         if (receivedCounter != null
                 && scanLogRepository.existsByTagUidAndReceivedCounterAndScanResult(uid, receivedCounter, result)) {
             return null;

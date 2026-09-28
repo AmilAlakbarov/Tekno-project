@@ -25,7 +25,7 @@ app:
   public-base-url: ${PUBLIC_BASE_URL:}
   frontend-origins: ${FRONTEND_ORIGINS:http://localhost:5173}
   nfc:
-    blocked-source-ips: ${NFC_BLOCKED_SOURCE_IPS:}
+    replay-log-suppressed-source-ips: ${NFC_REPLAY_LOG_SUPPRESSED_SOURCE_IPS:}
   hsm:
     base-url: ${HSM_BASE_URL:}
     service-token: ${HSM_SERVICE_TOKEN:}

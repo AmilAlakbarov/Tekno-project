@@ -35,7 +35,8 @@ class VerificationServiceGeoIpTest {
     private final SignatureVerificationService signatures = mock(SignatureVerificationService.class);
     private final HsmClient hsmClient = mock(HsmClient.class);
     private final GeoIpService geoIp = mock(GeoIpService.class);
-    private final VerificationService service = new VerificationService(tags, logs, signatures, hsmClient, geoIp);
+    private final VerificationService service = new VerificationService(
+            tags, logs, signatures, hsmClient, geoIp, "74.125.208.230,74.125.208.231");
     private final Product product = new Product(UUID.randomUUID(), "Product", "Maker", null);
     private final NfcTag tag = new NfcTag(UUID.randomUUID(), product, "04AABBCCDDEEFF", "00112233445566778899AABBCCDDEEFF");
     private final VerifyRequest request = new VerifyRequest("04AABBCCDDEEFF", "000001",
@@ -69,6 +70,27 @@ class VerificationServiceGeoIpTest {
         assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
         assertThat(capturedScanLog().getGeoCountry()).isNull();
         assertThat(tag.getLastScanCounter()).isZero();
+    }
+
+    @Test
+    void rejectsButDoesNotLogReplayFromConfiguredSourceIp() {
+        tag.setLastScanCounter(12);
+        VerifyResponse response = service.verifySdm(
+                "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "74.125.208.230");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        verify(logs, never()).save(any(ScanLog.class));
+        verify(signatures, never()).matchesNtag424(any(), any(), any(), any(), any());
+    }
+
+    @Test
+    void keepsLoggingReplayFromOtherSourceIps() {
+        tag.setLastScanCounter(12);
+        VerifyResponse response = service.verifySdm(
+                "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.REPLAY_ATTACK);
     }
 
     @Test

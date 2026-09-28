@@ -137,6 +137,10 @@ not proof of a user's physical location.
 
 An NFC URL's host and path are included in its signed data. If the public host
 changes, reconfigure the tag's SDM URL and generate a new CMAC.
+Set `NFC_REPLAY_LOG_SUPPRESSED_SOURCE_IPS` to a comma-separated list of exact
+source IPs whose replay attempts should still be rejected but omitted from scan
+history. This does not block valid scans from those IPs and does not classify
+Google IP ranges automatically.
 
 ## Dashboard accounts
 
