@@ -73,8 +73,22 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
+    void recordsInvalidJsonCmacAsTamperedEvenWhenItsCounterWasAlreadyAccepted() {
+        tag.setLastScanCounter(1);
+        when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(false);
+
+        VerifyResponse response = service.verify(request, "74.125.208.230");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
+        verify(signatures).matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac());
+    }
+
+    @Test
     void rejectsButDoesNotLogReplayFromConfiguredSourceIp() {
         tag.setLastScanCounter(12);
+        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+                "0011223344556677", tag.getAesKey())).thenReturn(true);
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "74.125.208.230");
 
@@ -86,11 +100,41 @@ class VerificationServiceGeoIpTest {
     @Test
     void keepsLoggingReplayFromOtherSourceIps() {
         tag.setLastScanCounter(12);
+        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+                "0011223344556677", tag.getAesKey())).thenReturn(true);
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "8.8.8.8");
 
         assertThat(response.status()).isEqualTo("FAKE");
         assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.REPLAY_ATTACK);
+    }
+
+    @Test
+    void recordsTamperedCmacBeforeClassifyingTheReusedCounterAsReplay() {
+        tag.setLastScanCounter(12);
+        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+                "1011223344556677", tag.getAesKey())).thenReturn(false);
+
+        VerifyResponse response = service.verifySdm(
+                "04AABBCCDDEEFF", "00000C", "1011223344556677", "mac-input", "74.125.208.230");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
+        verify(signatures).matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+                "1011223344556677", tag.getAesKey());
+    }
+
+    @Test
+    void recordsMalformedCmacAsTamperedWithoutCallingHsm() {
+        tag.setLastScanCounter(12);
+        when(hsmClient.isConfigured()).thenReturn(true);
+
+        VerifyResponse response = service.verifySdm(
+                "04AABBCCDDEEFF", "00000C", "not-a-cmac", "mac-input", "8.8.8.8");
+
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
+        verify(hsmClient, never()).verifyNtag424(any(), any(), any(), any());
     }
 
     @Test

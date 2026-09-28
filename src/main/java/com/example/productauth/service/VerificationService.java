@@ -74,15 +74,16 @@ public class VerificationService {
         if (tag.getStatus() != TagStatus.ACTIVE) {
             return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
-        if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(request, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
-        }
-
         boolean signatureValid = hsmClient.isConfigured()
                 ? hsmClient.verifyCmac(uid, counter, request.cmac())
                 : signatureVerificationService.matches(uid, counter, tag.getAesKey(), request.cmac());
         if (!signatureValid) {
             return recordFailure(request, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
+        }
+
+        if (counter <= tag.getLastScanCounter()) {
+            return recordFailure(request, ipAddress, ScanResult.REPLAY_ATTACK, tag,
+                    "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
@@ -108,7 +109,7 @@ public class VerificationService {
             String ipAddress) {
         String normalizedUid = uid.toUpperCase(Locale.ROOT);
         String normalizedCounter = counterHex.toUpperCase(Locale.ROOT);
-        String normalizedCmac = incomingCmac.toUpperCase(Locale.ROOT);
+        String normalizedCmac = incomingCmac == null ? "" : incomingCmac.toUpperCase(Locale.ROOT);
 
         Optional<NfcTag> tagOptional = nfcTagRepository.findByTagUid(normalizedUid);
         if (tagOptional.isEmpty()) {
@@ -129,8 +130,9 @@ public class VerificationService {
                     counterOrZero(normalizedCounter), tag.getLastScanCounter() + 1);
         }
 
-        if (counter <= tag.getLastScanCounter()) {
-            return recordFailure(normalizedUid, ipAddress, ScanResult.REPLAY_ATTACK, tag, "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
+        if (!normalizedCmac.matches("(?i)[0-9a-f]{16}")) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag,
+                    "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
         }
 
         boolean signatureValid = hsmClient.isConfigured()
@@ -139,6 +141,11 @@ public class VerificationService {
                         normalizedUid, normalizedCounter, macInput, normalizedCmac, tag.getAesKey());
         if (!signatureValid) {
             return recordFailure(normalizedUid, ipAddress, ScanResult.TAMPERED, tag, "Product authentication failed.", counter, tag.getLastScanCounter() + 1);
+        }
+
+        if (counter <= tag.getLastScanCounter()) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.REPLAY_ATTACK, tag,
+                    "Replay attack detected.", counter, tag.getLastScanCounter() + 1);
         }
 
         if (counter - tag.getLastScanCounter() > MAX_COUNTER_JUMP) {

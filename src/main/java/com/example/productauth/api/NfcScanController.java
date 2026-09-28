@@ -50,25 +50,21 @@ public class NfcScanController {
         String uid = parameters.get("uid");
         String counter = parameters.get("ctr");
         String cmac = parameters.get("cmac");
-        if (uid == null || counter == null || cmac == null
+        if (uid == null || counter == null
                 || !uid.matches("(?i)[0-9a-f]{14}")
-                || !counter.matches("(?i)[0-9a-f]{6}")
-                || !cmac.matches("(?i)[0-9a-f]{16}")) {
+                || !counter.matches("(?i)[0-9a-f]{6}")) {
             return page("FAKE", "NFC authentication data is incomplete or invalid.",
                     null, null, null, null);
         }
 
         String query = request.getQueryString();
         int cmacIndex = query == null ? -1 : query.toLowerCase().indexOf("cmac=");
-        if (cmacIndex < 0) {
-            return page("FAKE", "NFC authentication data is invalid.",
-                    uid, counter, null, null);
-        }
-
         String requestBaseUrl = publicBaseUrl.isBlank()
                 ? request.getRequestURL().toString()
                 : publicBaseUrl + request.getRequestURI();
-        String macInput = requestBaseUrl + "?" + query.substring(0, cmacIndex + 5);
+        String macInput = cmacIndex < 0
+                ? requestBaseUrl + "?" + (query == null ? "" : query) + "&cmac="
+                : requestBaseUrl + "?" + query.substring(0, cmacIndex + 5);
         VerifyResponse result = verificationService.verifySdm(uid, counter, cmac, macInput, clientIp(request));
         return page(result.status(), result.message(), uid, counter, cmac, result.product());
     }
