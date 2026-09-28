@@ -87,20 +87,20 @@ class VerificationServiceGeoIpTest {
     @Test
     void rejectsButDoesNotLogReplayFromConfiguredSourceIp() {
         tag.setLastScanCounter(12);
-        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+        when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "0011223344556677", tag.getAesKey())).thenReturn(true);
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "74.125.208.230");
 
         assertThat(response.status()).isEqualTo("FAKE");
         verify(logs, never()).save(any(ScanLog.class));
-        verify(signatures, never()).matchesNtag424(any(), any(), any(), any(), any());
+        verify(signatures, never()).matchesNtag424Sdm(any(), any(), any(), any(), any());
     }
 
     @Test
     void keepsLoggingReplayFromOtherSourceIps() {
         tag.setLastScanCounter(12);
-        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+        when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "0011223344556677", tag.getAesKey())).thenReturn(true);
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "8.8.8.8");
@@ -112,7 +112,7 @@ class VerificationServiceGeoIpTest {
     @Test
     void recordsTamperedCmacBeforeClassifyingTheReusedCounterAsReplay() {
         tag.setLastScanCounter(12);
-        when(signatures.matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+        when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "1011223344556677", tag.getAesKey())).thenReturn(false);
 
         VerifyResponse response = service.verifySdm(
@@ -120,7 +120,7 @@ class VerificationServiceGeoIpTest {
 
         assertThat(response.status()).isEqualTo("FAKE");
         assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
-        verify(signatures).matchesNtag424("04AABBCCDDEEFF", "00000C", "mac-input",
+        verify(signatures).matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "1011223344556677", tag.getAesKey());
     }
 
