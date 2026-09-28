@@ -12,6 +12,8 @@ services:
         value: https://admin.authentichain.website,https://authentichain-dashboard.onrender.com
       - key: HSM_BASE_URL
         value: https://authentichain-hsm.onrender.com
+      - key: NFC_BLOCKED_SOURCE_IPS
+        value: 74.125.208.230
       - key: HSM_SERVICE_TOKEN
         sync: false
       - key: GEOIP_LICENSE_KEY

@@ -14,6 +14,9 @@ const navItems = [
 ]
 
 const number = (value) => new Intl.NumberFormat().format(value || 0)
+const counterHex = (value) => value == null
+  ? '—'
+  : `0x${Number(value).toString(16).toUpperCase().padStart(6, '0')}`
 const timeAgo = (value) => {
   if (!value) return '—'
   const minutes = Math.max(0, Math.floor((Date.now() - new Date(value).getTime()) / 60000))
@@ -240,7 +243,7 @@ function MapAutoFit({ locations }) {
 function ScanTable({ rows, security = false }) {
   if (!rows.length) return <div className="empty-state">No scan activity recorded yet.</div>
   const visibleRows = uniqueScans(rows)
-  return <div className="table-wrap"><table className="scan-table"><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR</th><th>NEXT ACCEPTED CTR</th>{security && <><th>LOCATION EVIDENCE</th><th>IP</th></>}</tr></thead><tbody>{visibleRows.map((row, index) => {
+  return <div className="table-wrap"><table className="scan-table"><thead><tr><th>TAG UID</th><th>TIME</th><th>RESULT</th><th>RECEIVED CTR (HEX)</th><th>NEXT ACCEPTED CTR (HEX)</th>{security && <><th>LOCATION EVIDENCE</th><th>IP</th></>}</tr></thead><tbody>{visibleRows.map((row, index) => {
     const geoPlace = [row.geoCity, row.geoRegion, row.geoCountry].filter(Boolean).join(', ')
     const geoCoordinates = row.geoLatitude != null && row.geoLongitude != null
       ? `${Number(row.geoLatitude).toFixed(3)}, ${Number(row.geoLongitude).toFixed(3)}`
@@ -255,7 +258,7 @@ function ScanTable({ rows, security = false }) {
       : row.latitude != null && row.longitude != null
         ? `Client-supplied coordinates (untrusted): ${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}`
         : 'No GeoIP location'
-    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td data-label="TAG UID"><code>{row.uid || '—'}</code></td><td data-label="TIME"><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td data-label="RESULT"><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td data-label="RECEIVED CTR">{row.receivedCounter ?? '—'}</td><td data-label="NEXT ACCEPTED CTR">{row.expectedCounter ?? '—'}</td>{security && <><td data-label="LOCATION">{locationEvidence}</td><td data-label="IP"><code>{row.ipAddress || '—'}</code></td></>}</tr>
+    return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td data-label="TAG UID"><code>{row.uid || '—'}</code></td><td data-label="TIME"><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td data-label="RESULT"><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td data-label="RECEIVED CTR (HEX)" title={row.receivedCounter == null ? undefined : `${number(row.receivedCounter)} decimal`}>{counterHex(row.receivedCounter)}</td><td data-label="NEXT ACCEPTED CTR (HEX)" title={row.expectedCounter == null ? undefined : `${number(row.expectedCounter)} decimal`}>{counterHex(row.expectedCounter)}</td>{security && <><td data-label="LOCATION">{locationEvidence}</td><td data-label="IP"><code>{row.ipAddress || '—'}</code></td></>}</tr>
   })}</tbody></table></div>
 }
 
@@ -406,7 +409,7 @@ function TagsPage({ readOnly = false }) {
       {loading ? <div className="empty-state">Loading tag registry…</div> : <div className="table-wrap"><table className="tag-table"><thead><tr>{!readOnly && <th><input type="checkbox" aria-label="Select all tags on this page" checked={selectedAllOnPage} onChange={(event) => togglePageSelection(event.target.checked)} /></th>}<th>TAG UID</th><th>PRODUCT</th><th>MANUFACTURER</th><th>LAST COUNTER</th><th>STATUS</th>{!readOnly && <th />}</tr></thead><tbody>{tags.map((tag) => <tr key={tag.uid}>
         {!readOnly && <td><input type="checkbox" aria-label={`Select tag ${tag.uid}`} checked={selected.has(tag.uid)} onChange={(event) => setSelected((current) => { const next = new Set(current); event.target.checked ? next.add(tag.uid) : next.delete(tag.uid); return next })} /></td>}
         <td data-label="TAG UID"><code>{tag.uid}</code></td><td data-label="PRODUCT"><strong>{tag.displayName || tag.productName || products.find((product) => product.id === tag.productId)?.name || 'Unassigned'}</strong>{tag.description && <small className="table-subtitle">{tag.description}</small>}</td>
-        <td data-label="MANUFACTURER">{tag.manufacturer || products.find((product) => product.id === tag.productId)?.manufacturer || '—'}</td><td data-label="LAST COUNTER">{number(tag.lastScanCounter)}</td><td data-label="STATUS"><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td>
+        <td data-label="MANUFACTURER">{tag.manufacturer || products.find((product) => product.id === tag.productId)?.manufacturer || '—'}</td><td data-label="LAST COUNTER (HEX)" title={`${number(tag.lastScanCounter)} decimal`}>{counterHex(tag.lastScanCounter)}</td><td data-label="STATUS"><span className={`badge status-${String(tag.status || '').toLowerCase()}`}>{tag.status || 'UNKNOWN'}</span></td>
         {!readOnly && <td className="actions"><button className="outline-button" disabled={processing} onClick={() => setEditing({ ...tag })}>Edit</button>{String(tag.status).toLowerCase() !== 'revoked' ? <button className="danger-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'REVOKED')}>Revoke</button> : <button className="outline-button" disabled={processing} onClick={() => changeStatus(tag.uid, 'ACTIVE')}>Activate</button>}<button className="danger-button" disabled={processing} onClick={() => removeTag(tag.uid)}>Delete</button></td>}
       </tr>)}</tbody></table>{tags.length === 0 && <div className="empty-state">No tags match these filters.</div>}</div>}
       <div className="pagination"><span className="muted">Page {pageIndex + 1} of {totalPages}</span><div><button className="outline-button" disabled={pageIndex === 0 || loading} onClick={() => { setSelected(new Set()); setPageIndex((current) => Math.max(0, current - 1)) }}>Previous</button><button className="outline-button" disabled={pageIndex + 1 >= totalPages || loading} onClick={() => { setSelected(new Set()); setPageIndex((current) => current + 1) }}>Next</button></div></div>
