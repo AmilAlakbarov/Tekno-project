@@ -239,7 +239,7 @@ public class NfcScanController {
                     .location-share #location-status { margin-top: 10px; }
                     .product { margin-top: 28px; padding: 18px; border-radius: 16px; text-align: left;
                       background: #f7f9fa; border: 1px solid #edf1f2; }
-                    .product-image { display: block; width: min(100%, 260px); height: 180px; object-fit: contain;
+                    .product-image { display: block; width: min(100%%, 260px); height: 180px; object-fit: contain;
                       margin: 0 auto 14px; border-radius: 12px; background: #fff; }
                     .image-caption { display: block; margin: -6px 0 12px; color: #829198;
                       text-align: center; font-size: 11px; }
