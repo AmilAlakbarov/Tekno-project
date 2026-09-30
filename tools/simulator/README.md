@@ -81,12 +81,13 @@ the backend and HSM for a successful scan.
 The travel-test helper submits two valid JSON scans with sequential counters.
 It defaults to Baku for the first scan and Sanliurfa for the second, using
 coordinates from the local simulator vault to generate valid CMACs:
+Baku `40.4093, 49.8671` and Sanliurfa `37.1674, 38.7955`.
 
 ```powershell
 & $Python .\test-impossible-travel.py --uid 04ABCDEF123456
 ```
 
-The two scans must happen within roughly 60 minutes for the Baku-to-Sanliurfa
+The two scans must happen within roughly one hour for the Baku-to-Sanliurfa
 distance to exceed the server's 1,000 km/h threshold. The JSON coordinates are
 unverified advisory evidence. For physical NFC scans, the result page's
 **Share location and check travel** button submits browser GPS after tag

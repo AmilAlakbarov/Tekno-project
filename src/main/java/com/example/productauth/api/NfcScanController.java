@@ -125,6 +125,10 @@ public class NfcScanController {
         String productName = product == null ? "Product not verified" : escape(product.name());
         String manufacturer = product == null ? "Authentication did not complete successfully"
                 : escape(product.manufacturer());
+        String productImage = product == null ? ""
+                : "<img class=\"product-image\" src=\"" + escape(product.imageUrl())
+                        + "\" alt=\"Product image for " + escape(product.name()) + "\">"
+                        + (product.demoImage() ? "<span class=\"image-caption\">Demo illustration</span>" : "");
         String details = uid == null ? "Scan data was not complete enough to display."
                 : "UID " + escape(uid.toUpperCase(Locale.ROOT))
                         + (counter == null ? "" : "  ·  Counter " + Integer.parseInt(counter, 16));
@@ -235,6 +239,10 @@ public class NfcScanController {
                     .location-share #location-status { margin-top: 10px; }
                     .product { margin-top: 28px; padding: 18px; border-radius: 16px; text-align: left;
                       background: #f7f9fa; border: 1px solid #edf1f2; }
+                    .product-image { display: block; width: min(100%, 260px); height: 180px; object-fit: contain;
+                      margin: 0 auto 14px; border-radius: 12px; background: #fff; }
+                    .image-caption { display: block; margin: -6px 0 12px; color: #829198;
+                      text-align: center; font-size: 11px; }
                     .product-label { color: #7a8990; font-size: 11px; font-weight: 800; letter-spacing: .1em;
                       text-transform: uppercase; }
                     .product-name { margin-top: 6px; font-size: 18px; font-weight: 750; }
@@ -262,6 +270,7 @@ public class NfcScanController {
                       <p class="message">%s</p>
                       <div class="product">
                         <div class="product-label">Scanned item</div>
+                        %s
                         <div class="product-name">%s</div>
                         <div class="manufacturer">%s</div>
                       </div>
@@ -274,7 +283,7 @@ public class NfcScanController {
                 </html>
                 """.formatted(title, accentBackground, accentColor, accentColor, accentBackground,
                 accentColor, icon, eyebrow,
-                title, safeMessage, productName, manufacturer, details, macDetail, locationShare);
+                title, safeMessage, productImage, productName, manufacturer, details, macDetail, locationShare);
         return ResponseEntity.ok().contentType(MediaType.TEXT_HTML).body(html);
     }
 

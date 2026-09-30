@@ -162,6 +162,9 @@ class VerificationServiceGeoIpTest {
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
         assertThat(response.status()).isEqualTo("REAL");
+        assertThat(response.product().name()).isEqualTo("Product");
+        assertThat(response.product().imageUrl()).startsWith("/demo-products/demo-product-");
+        assertThat(response.product().demoImage()).isTrue();
         verify(hsmClient).verifyCmac("04AABBCCDDEEFF", 1, request.cmac());
         verify(signatures, never()).matches("04AABBCCDDEEFF", 1, null, request.cmac());
         assertThat(tag.getLastScanCounter()).isEqualTo(1);
@@ -342,13 +345,13 @@ class VerificationServiceGeoIpTest {
                 .thenReturn(Optional.of(previous));
 
         VerificationService.DeviceLocationResult result = service.attachDeviceLocationAndCheckTravel(
-                "04AABBCCDDEEFF", 2, 37.1591, 38.7969);
+                "04AABBCCDDEEFF", 2, 37.1674, 38.7955);
 
         assertThat(result.attached()).isTrue();
         assertThat(result.travelAnomaly()).isTrue();
         assertThat(result.speedKmh()).isGreaterThan(1000.0);
         assertThat(result.distanceKm()).isGreaterThan(1.0);
-        verify(current).setDeviceLocation(37.1591, 38.7969);
+        verify(current).setDeviceLocation(37.1674, 38.7955);
         verify(current).markSpeedAnomaly();
         verify(logs).save(current);
     }

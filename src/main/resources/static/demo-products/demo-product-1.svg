@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360" role="img" aria-labelledby="title">
+  <title id="title">Demo skincare bottle illustration</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1">
+      <stop stop-color="#e6f5f1"/>
+      <stop offset="1" stop-color="#d7e9e5"/>
+    </linearGradient>
+    <linearGradient id="glass" x2="1" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#d6e9e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="520" height="360" rx="28" fill="url(#bg)"/>
+  <circle cx="410" cy="84" r="38" fill="#fff" opacity=".55"/>
+  <ellipse cx="260" cy="300" rx="104" ry="17" fill="#17323d" opacity=".12"/>
+  <rect x="223" y="70" width="74" height="40" rx="9" fill="#17323d"/>
+  <rect x="236" y="48" width="48" height="26" rx="7" fill="#087f6b"/>
+  <rect x="183" y="104" width="154" height="182" rx="30" fill="url(#glass)" stroke="#a7c9c2" stroke-width="4"/>
+  <path d="M196 128v103" stroke="#fff" stroke-linecap="round" stroke-width="9" opacity=".8"/>
+  <rect x="202" y="165" width="116" height="76" rx="12" fill="#fff" opacity=".8"/>
+  <path d="M227 188h66M232 204h56M240 220h40" stroke="#087f6b" stroke-linecap="round" stroke-width="6"/>
+  <path d="M136 272c-23-45-12-82 28-108 5 40-1 76-28 108Zm248 0c23-45 12-82-28-108-5 40 1 76 28 108Z" fill="#77ad9f" opacity=".8"/>
+</svg>

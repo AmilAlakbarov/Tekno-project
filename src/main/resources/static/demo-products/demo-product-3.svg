@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360" role="img" aria-labelledby="title">
+  <title id="title">Demo wellness container illustration</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1">
+      <stop stop-color="#e8eefb"/>
+      <stop offset="1" stop-color="#dce6f6"/>
+    </linearGradient>
+    <linearGradient id="jar" x2="1" y2="1">
+      <stop stop-color="#fff"/>
+      <stop offset="1" stop-color="#dfe7f4"/>
+    </linearGradient>
+  </defs>
+  <rect width="520" height="360" rx="28" fill="url(#bg)"/>
+  <circle cx="405" cy="90" r="43" fill="#fff" opacity=".55"/>
+  <ellipse cx="260" cy="299" rx="112" ry="17" fill="#172c4b" opacity=".13"/>
+  <path d="M210 91h100l12 28H198l12-28Z" fill="#30486f"/>
+  <rect x="186" y="116" width="148" height="174" rx="28" fill="url(#jar)" stroke="#bac9df" stroke-width="4"/>
+  <path d="M198 137v91" stroke="#fff" stroke-linecap="round" stroke-width="9" opacity=".9"/>
+  <rect x="204" y="163" width="112" height="80" rx="13" fill="#fff" opacity=".82"/>
+  <circle cx="260" cy="185" r="11" fill="#6588bd"/>
+  <path d="M260 178v14m-7-7h14" stroke="#fff" stroke-linecap="round" stroke-width="3"/>
+  <path d="M224 211h72M230 227h60" stroke="#5978a7" stroke-linecap="round" stroke-width="5"/>
+  <path d="M147 262c15-26 31-40 48-43m178 43c-15-26-31-40-48-43" fill="none" stroke="#8ca7ce" stroke-linecap="round" stroke-width="7"/>
+</svg>

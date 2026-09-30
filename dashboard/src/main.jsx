@@ -209,8 +209,8 @@ function LocationMap({ locations }) {
     >
       <Popup>
         <strong>{point.source === 'DEVICE_GPS'
-          ? 'User-shared device location (unverified)'
-          : 'Approximate GeoIP network location'}</strong><br />
+          ? 'User-shared device GPS (unverified)'
+          : 'GeoLite2 City · approximate IP location'}</strong><br />
         {point.latitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}, {point.longitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}
         {point.timestamp && <><br />{exactTime(point.timestamp)}</>}
       </Popup>
@@ -251,10 +251,10 @@ function ScanTable({ rows, security = false }) {
     const locationEvidence = deviceCoordinates
       ? `User-shared device GPS (unverified): ${deviceCoordinates}`
       : geoPlace
-      ? `GeoIP: ${geoPlace}${row.geoCountryIsoCode ? ` (${row.geoCountryIsoCode})` : ''}${geoCoordinates ? ` · ${geoCoordinates}` : ''}`
+      ? `GeoLite2 City · approximate IP location: ${geoPlace}${row.geoCountryIsoCode ? ` (${row.geoCountryIsoCode})` : ''}${geoCoordinates ? ` · ${geoCoordinates}` : ''}`
       : row.latitude != null && row.longitude != null
         ? `Client-supplied coordinates (untrusted): ${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}`
-        : 'No GeoIP location'
+        : 'No GPS or GeoIP location'
     return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td data-label="TAG UID"><code>{row.uid || '—'}</code></td><td data-label="TIME"><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td data-label="RESULT"><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td data-label="RECEIVED CTR">{row.receivedCounter == null ? '—' : number(row.receivedCounter)}</td><td data-label="NEXT ACCEPTED CTR">{row.expectedCounter == null ? '—' : number(row.expectedCounter)}</td>{security && <><td data-label="LOCATION">{locationEvidence}</td><td data-label="IP"><code>{row.ipAddress || '—'}</code></td></>}</tr>
   })}</tbody></table></div>
 }

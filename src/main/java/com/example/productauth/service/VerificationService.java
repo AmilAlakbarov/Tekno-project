@@ -95,7 +95,7 @@ public class VerificationService {
         nfcTagRepository.save(tag);
         saveSuccessfulLog(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress,
                 counter, counter + 1, geoLocation.orElse(null));
-        return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
+        return VerifyResponse.real(productSummary(tag));
     }
 
     @Transactional
@@ -157,7 +157,7 @@ public class VerificationService {
         nfcTagRepository.save(tag);
         saveSuccessfulLog(normalizedUid, null, null, ipAddress, counter, counter + 1,
                 geoLocation.orElse(null));
-        return VerifyResponse.real(new ProductSummary(tag.getProduct().getName(), tag.getProduct().getManufacturer()));
+        return VerifyResponse.real(productSummary(tag));
     }
 
     @Transactional
@@ -213,6 +213,20 @@ public class VerificationService {
         }
         return scanLogRepository.save(new ScanLog(uid, latitude, longitude, ipAddress,
                 ScanResult.REAL, receivedCounter, expectedCounter, geoLocation));
+    }
+
+    private ProductSummary productSummary(NfcTag tag) {
+        String displayName = tag.getDisplayName();
+        String name = displayName == null || displayName.isBlank()
+                ? tag.getProduct().getName()
+                : displayName;
+        String imageUrl = tag.getImageUrl();
+        boolean demoImage = imageUrl == null || imageUrl.isBlank();
+        if (demoImage) {
+            int imageNumber = Math.floorMod(tag.getTagUid().hashCode(), 3) + 1;
+            imageUrl = "/demo-products/demo-product-" + imageNumber + ".svg";
+        }
+        return new ProductSummary(name, tag.getProduct().getManufacturer(), imageUrl, demoImage);
     }
 
     private int counterOrZero(String counter) {

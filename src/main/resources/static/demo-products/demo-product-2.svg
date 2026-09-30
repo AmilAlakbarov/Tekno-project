@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 520 360" role="img" aria-labelledby="title">
+  <title id="title">Demo premium product box illustration</title>
+  <defs>
+    <linearGradient id="bg" x2="1" y2="1">
+      <stop stop-color="#f4ecdf"/>
+      <stop offset="1" stop-color="#ead9bf"/>
+    </linearGradient>
+    <linearGradient id="box" x2="1" y2="1">
+      <stop stop-color="#17433e"/>
+      <stop offset="1" stop-color="#0a2928"/>
+    </linearGradient>
+  </defs>
+  <rect width="520" height="360" rx="28" fill="url(#bg)"/>
+  <circle cx="112" cy="92" r="38" fill="#fff" opacity=".46"/>
+  <ellipse cx="265" cy="300" rx="130" ry="17" fill="#342a1b" opacity=".14"/>
+  <path d="m168 116 96-46 96 46-96 49-96-49Z" fill="#316a60"/>
+  <path d="M168 116v142l96 49V165l-96-49Z" fill="url(#box)"/>
+  <path d="M360 116v142l-96 49V165l96-49Z" fill="#123a36"/>
+  <path d="M264 165v142" stroke="#86b7a5" stroke-width="3" opacity=".6"/>
+  <path d="M226 204h76M226 220h76M237 238h54" stroke="#e7c889" stroke-linecap="round" stroke-width="6"/>
+  <path d="M264 179c-12-16-29-5-16 10l16 15 16-15c13-15-4-26-16-10Z" fill="#e7c889"/>
+</svg>

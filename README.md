@@ -145,6 +145,10 @@ when it comes from the same source IP as that tag's latest verified scan;
 replays from a different or unavailable source IP are omitted from history.
 This is an exact IP comparison, not a Google-network classifier, and proxies or
 mobile-network IP changes may affect the comparison.
+IP geolocation and VPN/proxy detection are not identity checks. For stronger
+network risk signals, combine MaxMind ASN data or a reputable proxy-risk feed
+with rate limits and behavioral signals; use the result for risk scoring or
+step-up checks rather than claiming a VPN can be reliably bypassed.
 
 Impossible-travel checks use the great-circle (Haversine) distance between the
 latest verified scan's submitted coordinates and the new submitted
@@ -153,7 +157,13 @@ GeoIP is displayed as contextual evidence only; it is not used for this check.
 The JSON verification endpoint evaluates supplied coordinates immediately.
 The NFC result page can optionally submit device GPS afterward; that report
 checks the already-verified scan and flags it in history if the speed threshold
-is exceeded. Shared coordinates are unverified and advisory.
+is exceeded. Dashboard location views prefer user-shared GPS and use GeoLite2
+City IP location only when GPS is unavailable. GPS is unverified; GeoLite2
+locations are approximate network estimates.
+
+Verified products show a tag's configured display name and custom image when
+available. Otherwise the demo uses the product name and a clearly labeled
+illustration; the illustration is not evidence of the physical product.
 
 ## Dashboard accounts
 

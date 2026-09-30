@@ -1,4 +1,4 @@
 package com.example.productauth.api.dto;
 
-public record ProductSummary(String name, String manufacturer) {
+public record ProductSummary(String name, String manufacturer, String imageUrl, boolean demoImage) {
 }

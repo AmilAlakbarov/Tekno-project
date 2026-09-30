@@ -14,7 +14,7 @@ from cryptography.hazmat.primitives.ciphers import algorithms
 DEFAULT_VAULT = Path(__file__).resolve().with_name("simulator_vault.json")
 DEFAULT_BACKEND_URL = "https://authentichain.website"
 BAKU = (40.4093, 49.8671)
-SANLIURFA = (37.44317, 38.90030)
+SANLIURFA = (37.1674, 38.7955)
 
 
 def load_tag(vault_path: Path, uid: str) -> tuple[str, int, dict[str, object], dict[str, object]]:
