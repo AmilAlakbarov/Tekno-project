@@ -8,6 +8,7 @@ import com.example.productauth.domain.ScanResult;
 
 import java.time.Instant;
 import java.time.LocalDate;
+import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -17,6 +18,15 @@ public interface ScanLogRepository extends JpaRepository<ScanLog, UUID> {
     Optional<ScanLog> findTopByTagUidOrderByScannedAtDesc(String tagUid);
 
     Optional<ScanLog> findTopByTagUidAndScanResultOrderByScannedAtDesc(String tagUid, ScanResult scanResult);
+
+    Optional<ScanLog> findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+            String tagUid, Collection<ScanResult> scanResults);
+
+    Optional<ScanLog> findTopByTagUidAndScanResultAndIdNotOrderByScannedAtDesc(
+            String tagUid, ScanResult scanResult, UUID excludedId);
+
+    Optional<ScanLog> findTopByTagUidAndScanResultInAndIdNotOrderByScannedAtDesc(
+            String tagUid, Collection<ScanResult> scanResults, UUID excludedId);
 
     Optional<ScanLog> findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
             String tagUid, Integer receivedCounter, ScanResult scanResult);

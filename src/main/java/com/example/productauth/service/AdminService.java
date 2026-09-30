@@ -93,7 +93,8 @@ public class AdminService {
         return scanLogRepository
                 .findTop100ByOrderByScannedAtDesc()
                 .stream()
-                .filter(log -> log.getScanResult() == ScanResult.REAL
+                .filter(log -> (log.getScanResult() == ScanResult.REAL
+                        || log.getScanResult() == ScanResult.SPEED_ANOMALY)
                         && (log.getDeviceLatitude() != null && log.getDeviceLongitude() != null
                         || log.getGeoLatitude() != null && log.getGeoLongitude() != null))
                 .map(log -> log.getDeviceLatitude() != null

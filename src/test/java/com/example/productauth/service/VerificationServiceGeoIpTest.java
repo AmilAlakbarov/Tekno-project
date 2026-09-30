@@ -17,6 +17,7 @@ import org.mockito.InOrder;
 
 import java.time.Instant;
 import java.util.Optional;
+import java.util.List;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -36,7 +37,7 @@ class VerificationServiceGeoIpTest {
     private final HsmClient hsmClient = mock(HsmClient.class);
     private final GeoIpService geoIp = mock(GeoIpService.class);
     private final VerificationService service = new VerificationService(
-            tags, logs, signatures, hsmClient, geoIp, "74.125.208.230,74.125.208.231");
+            tags, logs, signatures, hsmClient, geoIp);
     private final Product product = new Product(UUID.randomUUID(), "Product", "Maker", null);
     private final NfcTag tag = new NfcTag(UUID.randomUUID(), product, "04AABBCCDDEEFF", "00112233445566778899AABBCCDDEEFF");
     private final VerifyRequest request = new VerifyRequest("04AABBCCDDEEFF", "000001",
@@ -66,7 +67,7 @@ class VerificationServiceGeoIpTest {
 
         assertThat(response.status()).isEqualTo("FAKE");
         verify(geoIp, never()).lookup(any());
-        verify(logs, never()).findTopByTagUidAndScanResultOrderByScannedAtDesc(any(), any());
+        verify(logs, never()).findTopByTagUidAndScanResultInOrderByScannedAtDesc(any(), any());
         assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.TAMPERED);
         assertThat(capturedScanLog().getGeoCountry()).isNull();
         assertThat(tag.getLastScanCounter()).isZero();
@@ -85,23 +86,34 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
-    void rejectsButDoesNotLogReplayFromConfiguredSourceIp() {
+    void rejectsButDoesNotLogReplayFromDifferentSourceIp() {
         tag.setLastScanCounter(12);
         when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "0011223344556677", tag.getAesKey())).thenReturn(true);
+        ScanLog latestVerifiedScan = mock(ScanLog.class);
+        when(latestVerifiedScan.getIpAddress()).thenReturn("8.8.8.8");
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(latestVerifiedScan));
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "74.125.208.230");
 
         assertThat(response.status()).isEqualTo("FAKE");
         verify(logs, never()).save(any(ScanLog.class));
-        verify(signatures, never()).matchesNtag424Sdm(any(), any(), any(), any(), any());
+        verify(signatures).matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
+                "0011223344556677", tag.getAesKey());
     }
 
     @Test
-    void keepsLoggingReplayFromOtherSourceIps() {
+    void keepsLoggingReplayFromSameSourceIpAsLatestVerifiedScan() {
         tag.setLastScanCounter(12);
         when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "00000C", "mac-input",
                 "0011223344556677", tag.getAesKey())).thenReturn(true);
+        ScanLog latestVerifiedScan = mock(ScanLog.class);
+        when(latestVerifiedScan.getIpAddress()).thenReturn("8.8.8.8");
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(latestVerifiedScan));
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "00000C", "0011223344556677", "mac-input", "8.8.8.8");
 
@@ -143,8 +155,9 @@ class VerificationServiceGeoIpTest {
         when(hsmClient.isConfigured()).thenReturn(true);
         when(hsmClient.verifyCmac("04AABBCCDDEEFF", 1, request.cmac())).thenReturn(true);
         when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.empty());
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.empty());
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.empty());
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -162,8 +175,9 @@ class VerificationServiceGeoIpTest {
         when(previous.getLatitude()).thenReturn(-40.0);
         when(previous.getLongitude()).thenReturn(-50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(previous));
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -173,22 +187,23 @@ class VerificationServiceGeoIpTest {
         assertThat(anomaly.getGeoCountry()).isNull();
         assertThat(tag.getLastScanCounter()).isZero();
         verify(tags, never()).save(tag);
-        verify(logs).findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL);
+        verify(logs).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY));
         verify(logs, never()).findTopByTagUidOrderByScannedAtDesc(any());
         InOrder order = inOrder(signatures, geoIp, logs);
         order.verify(signatures).matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac());
         order.verify(geoIp).lookup("8.8.8.8");
-        order.verify(logs).findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL);
+        order.verify(logs).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY));
     }
 
     @Test
     void savesGeoIpEvidenceOnlyOnRealScanAndKeepsClientCoordinatesSeparate() {
         when(signatures.matches("04AABBCCDDEEFF", 1, tag.getAesKey(), request.cmac())).thenReturn(true);
         when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(location));
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.empty());
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.empty());
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -214,8 +229,9 @@ class VerificationServiceGeoIpTest {
         when(previous.getLatitude()).thenReturn(-40.0);
         when(previous.getLongitude()).thenReturn(-50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(previous));
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -235,8 +251,9 @@ class VerificationServiceGeoIpTest {
         when(previous.getLatitude()).thenReturn(40.0);
         when(previous.getLongitude()).thenReturn(50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(previous));
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -254,8 +271,9 @@ class VerificationServiceGeoIpTest {
         when(previous.getDeviceLatitude()).thenReturn(-40.0);
         when(previous.getDeviceLongitude()).thenReturn(-50.0);
         when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
-        when(logs.findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL)).thenReturn(Optional.of(previous));
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(previous));
 
         VerifyResponse response = service.verify(request, "8.8.8.8");
 
@@ -277,8 +295,8 @@ class VerificationServiceGeoIpTest {
         assertThat(response.status()).isEqualTo("REAL");
         assertThat(capturedScanLog().getGeoLatitude()).isEqualTo(-40.0);
         assertThat(tag.getLastScanCounter()).isEqualTo(1);
-        verify(logs, never()).findTopByTagUidAndScanResultOrderByScannedAtDesc(
-                "04AABBCCDDEEFF", ScanResult.REAL);
+        verify(logs, never()).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY));
     }
 
     @Test
@@ -303,6 +321,36 @@ class VerificationServiceGeoIpTest {
 
         verify(scan).setDeviceLocation(40.4, 49.9);
         verify(logs).save(scan);
+    }
+
+    @Test
+    void flagsNfcScanWhenSharedLocationShowsImpossibleTravel() {
+        UUID currentId = UUID.randomUUID();
+        ScanLog current = mock(ScanLog.class);
+        when(current.getId()).thenReturn(currentId);
+        when(current.getDeviceLatitude()).thenReturn(null);
+        when(current.getDeviceLongitude()).thenReturn(null);
+        when(logs.findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", 2, ScanResult.REAL)).thenReturn(Optional.of(current));
+
+        ScanLog previous = mock(ScanLog.class);
+        when(previous.getLatitude()).thenReturn(40.4093);
+        when(previous.getLongitude()).thenReturn(49.8671);
+        when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
+        when(logs.findTopByTagUidAndScanResultInAndIdNotOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY), currentId))
+                .thenReturn(Optional.of(previous));
+
+        VerificationService.DeviceLocationResult result = service.attachDeviceLocationAndCheckTravel(
+                "04AABBCCDDEEFF", 2, 37.1591, 38.7969);
+
+        assertThat(result.attached()).isTrue();
+        assertThat(result.travelAnomaly()).isTrue();
+        assertThat(result.speedKmh()).isGreaterThan(1000.0);
+        assertThat(result.distanceKm()).isGreaterThan(1.0);
+        verify(current).setDeviceLocation(37.1591, 38.7969);
+        verify(current).markSpeedAnomaly();
+        verify(logs).save(current);
     }
 
     @Test

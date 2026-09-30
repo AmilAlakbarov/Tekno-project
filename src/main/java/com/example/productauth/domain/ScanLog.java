@@ -177,6 +177,13 @@ public class ScanLog {
         this.deviceLongitude = longitude;
     }
 
+    public void markSpeedAnomaly() {
+        if (scanResult != ScanResult.REAL) {
+            throw new IllegalStateException("Only verified scans can be flagged for impossible travel.");
+        }
+        this.scanResult = ScanResult.SPEED_ANOMALY;
+    }
+
     public String getIpAddress() {
         return ipAddress;
     }

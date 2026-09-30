@@ -12,47 +12,46 @@ import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ScanLogRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Duration;
-import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Service
 public class VerificationService {
+
+    public record DeviceLocationResult(boolean attached, boolean travelAnomaly,
+            Double speedKmh, Double distanceKm) {
+    }
+
+    private record TravelAssessment(Double speedKmh, double distanceKm, boolean anomaly) {
+    }
 
     private static final Logger log = LoggerFactory.getLogger(VerificationService.class);
     private static final double EARTH_RADIUS_KM = 6371.0088;
     private static final double MAX_SPEED_KMH = 1000.0;
     private static final int MAX_COUNTER_JUMP = 1000;
+    private static final List<ScanResult> TRAVEL_ELIGIBLE_RESULTS =
+            List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY);
 
     private final NfcTagRepository nfcTagRepository;
     private final ScanLogRepository scanLogRepository;
     private final SignatureVerificationService signatureVerificationService;
     private final HsmClient hsmClient;
     private final GeoIpService geoIpService;
-    private final Set<String> replayLogSuppressedSourceIps;
 
     public VerificationService(NfcTagRepository nfcTagRepository,
             ScanLogRepository scanLogRepository,
             SignatureVerificationService signatureVerificationService, HsmClient hsmClient,
-            GeoIpService geoIpService,
-            @Value("${app.nfc.replay-log-suppressed-source-ips:}") String replayLogSuppressedSourceIps) {
+            GeoIpService geoIpService) {
         this.nfcTagRepository = nfcTagRepository;
         this.scanLogRepository = scanLogRepository;
         this.signatureVerificationService = signatureVerificationService;
         this.hsmClient = hsmClient;
         this.geoIpService = geoIpService;
-        this.replayLogSuppressedSourceIps = Arrays.stream(replayLogSuppressedSourceIps.split(","))
-                .map(String::trim)
-                .map(ip -> ip.toLowerCase(Locale.ROOT))
-                .filter(ip -> !ip.isEmpty())
-                .collect(Collectors.toUnmodifiableSet());
     }
 
     @Transactional
@@ -163,16 +162,35 @@ public class VerificationService {
 
     @Transactional
     public boolean attachDeviceLocation(String uid, int counter, double latitude, double longitude) {
+        return attachDeviceLocationAndCheckTravel(uid, counter, latitude, longitude).attached();
+    }
+
+    @Transactional
+    public DeviceLocationResult attachDeviceLocationAndCheckTravel(
+            String uid, int counter, double latitude, double longitude) {
         String normalizedUid = uid.toUpperCase(Locale.ROOT);
         Optional<ScanLog> scan = scanLogRepository.findTopByTagUidAndReceivedCounterAndScanResultOrderByScannedAtDesc(
                 normalizedUid, counter, ScanResult.REAL);
         if (scan.isEmpty() || scan.get().getDeviceLatitude() != null
                 || scan.get().getDeviceLongitude() != null) {
-            return false;
+            return new DeviceLocationResult(false, false, null, null);
         }
-        scan.get().setDeviceLocation(latitude, longitude);
-        scanLogRepository.save(scan.get());
-        return true;
+        ScanLog currentScan = scan.get();
+        Optional<ScanLog> previousScan = scanLogRepository
+                .findTopByTagUidAndScanResultInAndIdNotOrderByScannedAtDesc(
+                        normalizedUid, TRAVEL_ELIGIBLE_RESULTS, currentScan.getId());
+        TravelAssessment assessment = previousScan
+                .map(previous -> assessTravel(previous, latitude, longitude))
+                .orElse(null);
+        currentScan.setDeviceLocation(latitude, longitude);
+        if (assessment != null && assessment.anomaly()) {
+            currentScan.markSpeedAnomaly();
+        }
+        scanLogRepository.save(currentScan);
+        return new DeviceLocationResult(true,
+                assessment != null && assessment.anomaly(),
+                assessment == null ? null : assessment.speedKmh(),
+                assessment == null ? null : assessment.distanceKm());
     }
 
     private VerifyResponse recordFailure(VerifyRequest request, String ipAddress, ScanResult result, NfcTag tag,
@@ -207,9 +225,8 @@ public class VerificationService {
 
     private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
             ScanResult result, Integer receivedCounter, Integer expectedCounter) {
-        if (result == ScanResult.REPLAY_ATTACK && ipAddress != null
-                && replayLogSuppressedSourceIps.contains(ipAddress.trim().toLowerCase(Locale.ROOT))) {
-            log.info("Replay attempt rejected; scan log suppressed for a configured source IP.");
+        if (result == ScanResult.REPLAY_ATTACK && !matchesLatestVerifiedScanIp(uid, ipAddress)) {
+            log.info("Replay attempt rejected; its source IP does not match the latest verified scan.");
             return null;
         }
         if (receivedCounter != null
@@ -220,14 +237,29 @@ public class VerificationService {
                 receivedCounter, expectedCounter));
     }
 
+    private boolean matchesLatestVerifiedScanIp(String uid, String ipAddress) {
+        if (ipAddress == null || ipAddress.isBlank()) {
+            return false;
+        }
+        Optional<ScanLog> latestVerifiedScan = scanLogRepository
+                .findTopByTagUidAndScanResultInOrderByScannedAtDesc(uid, TRAVEL_ELIGIBLE_RESULTS);
+        return latestVerifiedScan
+                .map(scan -> scan.getIpAddress() != null
+                        && scan.getIpAddress().trim().equalsIgnoreCase(ipAddress.trim()))
+                .orElse(false);
+    }
+
     private boolean hasTravelAnomaly(String uid, double latitude, double longitude) {
         Optional<ScanLog> previousOptional = scanLogRepository
-                .findTopByTagUidAndScanResultOrderByScannedAtDesc(uid, ScanResult.REAL);
+                .findTopByTagUidAndScanResultInOrderByScannedAtDesc(uid, TRAVEL_ELIGIBLE_RESULTS);
         if (previousOptional.isEmpty()) {
             return false;
         }
+        TravelAssessment assessment = assessTravel(previousOptional.get(), latitude, longitude);
+        return assessment != null && assessment.anomaly();
+    }
 
-        ScanLog previous = previousOptional.get();
+    private TravelAssessment assessTravel(ScanLog previous, double latitude, double longitude) {
         Double previousLatitude = previous.getDeviceLatitude() != null
                 ? previous.getDeviceLatitude()
                 : previous.getLatitude();
@@ -235,17 +267,17 @@ public class VerificationService {
                 ? previous.getDeviceLongitude()
                 : previous.getLongitude();
         if (previousLatitude == null || previousLongitude == null) {
-            log.info("Travel anomaly check skipped: latest successful scan has no submitted coordinates.");
-            return false;
+            log.info("Travel anomaly check skipped: latest verified scan has no submitted coordinates.");
+            return null;
         }
 
         double distanceKm = haversineKm(previousLatitude, previousLongitude, latitude, longitude);
         long elapsedSeconds = Duration.between(previous.getScannedAt(), java.time.Instant.now()).getSeconds();
         if (elapsedSeconds <= 0) {
-            return distanceKm > 0.001;
+            return new TravelAssessment(null, distanceKm, distanceKm > 0.001);
         }
         double speedKmh = distanceKm / (elapsedSeconds / 3600.0);
-        return speedKmh > MAX_SPEED_KMH;
+        return new TravelAssessment(speedKmh, distanceKm, speedKmh > MAX_SPEED_KMH);
     }
 
     static double haversineKm(double firstLatitude, double firstLongitude,

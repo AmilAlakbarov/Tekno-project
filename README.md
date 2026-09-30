@@ -135,12 +135,25 @@ not proof of a user's physical location.
 - `POST /api/v1/verify` — JSON scanner integration; requires UID, counter,
   CMAC, latitude, and longitude
 
+The dashboard displays counters as decimal integers. The signed NFC URL still
+uses the tag's hexadecimal counter representation for NTAG 424 authentication.
+
 An NFC URL's host and path are included in its signed data. If the public host
 changes, reconfigure the tag's SDM URL and generate a new CMAC.
-Set `NFC_REPLAY_LOG_SUPPRESSED_SOURCE_IPS` to a comma-separated list of exact
-source IPs whose replay attempts should still be rejected but omitted from scan
-history. This does not block valid scans from those IPs and does not classify
-Google IP ranges automatically.
+Replay attempts are always rejected. A replay is included in scan history only
+when it comes from the same source IP as that tag's latest verified scan;
+replays from a different or unavailable source IP are omitted from history.
+This is an exact IP comparison, not a Google-network classifier, and proxies or
+mobile-network IP changes may affect the comparison.
+
+Impossible-travel checks use the great-circle (Haversine) distance between the
+latest verified scan's submitted coordinates and the new submitted
+coordinates, divided by the elapsed time. Speeds above 1,000 km/h are flagged.
+GeoIP is displayed as contextual evidence only; it is not used for this check.
+The JSON verification endpoint evaluates supplied coordinates immediately.
+The NFC result page can optionally submit device GPS afterward; that report
+checks the already-verified scan and flags it in history if the speed threshold
+is exceeded. Shared coordinates are unverified and advisory.
 
 ## Dashboard accounts
 

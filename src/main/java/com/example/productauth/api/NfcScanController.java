@@ -70,24 +70,35 @@ public class NfcScanController {
     }
 
     @PostMapping(path = "/v1/location", consumes = MediaType.APPLICATION_JSON_VALUE)
-    public ResponseEntity<String> attachDeviceLocation(@Valid @RequestBody DeviceLocationRequest location) {
+    public ResponseEntity<DeviceLocationResponse> attachDeviceLocation(
+            @Valid @RequestBody DeviceLocationRequest location) {
         if (!Double.isFinite(location.latitude()) || location.latitude() < -90 || location.latitude() > 90
                 || !Double.isFinite(location.longitude()) || location.longitude() < -180
                 || location.longitude() > 180) {
-            return ResponseEntity.badRequest().body("Coordinates are outside valid latitude/longitude ranges.");
+            return ResponseEntity.badRequest()
+                    .body(new DeviceLocationResponse(false, false, null, null,
+                            "Coordinates are outside valid latitude/longitude ranges."));
         }
         int counter;
         try {
             counter = Integer.parseInt(location.counter(), 16);
         } catch (NumberFormatException exception) {
-            return ResponseEntity.badRequest().body("Scan counter is invalid.");
+            return ResponseEntity.badRequest()
+                    .body(new DeviceLocationResponse(false, false, null, null, "Scan counter is invalid."));
         }
-        if (!verificationService.attachDeviceLocation(location.uid(), counter,
-                location.latitude(), location.longitude())) {
+        VerificationService.DeviceLocationResult result = verificationService.attachDeviceLocationAndCheckTravel(
+                location.uid(), counter, location.latitude(), location.longitude());
+        if (!result.attached()) {
             return ResponseEntity.status(HttpStatus.CONFLICT)
-                    .body("Location could not be attached; this verified scan may not exist or already has a location.");
+                    .body(new DeviceLocationResponse(false, false, null, null,
+                            "Location could not be attached; this verified scan may not exist or already has a location."));
         }
-        return ResponseEntity.noContent().build();
+        return ResponseEntity.ok(new DeviceLocationResponse(true, result.travelAnomaly(),
+                result.speedKmh(), result.distanceKm(), null));
+    }
+
+    public record DeviceLocationResponse(boolean attached, boolean travelAnomaly,
+            Double speedKmh, Double distanceKm, String message) {
     }
 
     public record DeviceLocationRequest(
@@ -116,7 +127,7 @@ public class NfcScanController {
                 : escape(product.manufacturer());
         String details = uid == null ? "Scan data was not complete enough to display."
                 : "UID " + escape(uid.toUpperCase(Locale.ROOT))
-                        + (counter == null ? "" : "  ·  Counter " + escape(counter.toUpperCase(Locale.ROOT)));
+                        + (counter == null ? "" : "  ·  Counter " + Integer.parseInt(counter, 16));
         String macDetail = cmac == null ? "" : "<span>CMAC " + escape(cmac.toUpperCase(Locale.ROOT)) + "</span>";
         String icon = authentic
                 ? "<svg viewBox=\"0 0 24 24\" aria-hidden=\"true\"><path d=\"M20 6 9 17l-5-5\"/></svg>"
@@ -129,8 +140,8 @@ public class NfcScanController {
         String locationShare = authentic
                 ? """
                   <section class="location-share">
-                    <p>Optional: share this device's location as additional scan evidence. NFC authentication is already complete; declining does not affect the result. Device location may be inaccurate or spoofed.</p>
-                    <button id="share-location" type="button" data-uid="%s" data-counter="%s">Share device location (optional)</button>
+                    <p>Share this device's location to check for impossible travel between scans. This is advisory evidence and can be inaccurate or spoofed; NFC authentication is already complete.</p>
+                    <button id="share-location" type="button" data-uid="%s" data-counter="%s">Share location and check travel</button>
                     <p id="location-status" role="status" aria-live="polite"></p>
                   </section>
                   <script>
@@ -159,9 +170,16 @@ public class NfcScanController {
                               longitude: position.coords.longitude
                             })
                           });
-                          if (!response.ok) throw new Error(await response.text());
-                          status.textContent = 'Device location was added to this scan as user-shared evidence.';
-                          locationButton.textContent = 'Location shared';
+                          const result = await response.json();
+                          if (!response.ok) throw new Error(result.message || 'Could not save device location.');
+                          const speed = Number.isFinite(result.speedKmh)
+                            ? `${Number(result.speedKmh).toFixed(0)} km/h`
+                            : 'in less than one second';
+                          status.textContent = result.travelAnomaly
+                            ? `Speed anomaly flagged (${Number(result.distanceKm).toFixed(0)} km ${speed}).`
+                            : 'Location was added to this scan. No impossible-travel anomaly was detected.';
+                          locationButton.textContent = result.travelAnomaly ? 'Travel anomaly flagged' : 'Location shared';
+                          locationButton.disabled = true;
                         } catch (error) {
                           status.textContent = error.message || 'Could not save device location.';
                           locationButton.disabled = false;

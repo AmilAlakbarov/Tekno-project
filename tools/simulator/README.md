@@ -76,6 +76,23 @@ same URL twice tests replay detection. Changing one hexadecimal character in
 the `cmac` query value tests tamper detection. The tag must already exist in
 the backend and HSM for a successful scan.
 
+## Test impossible travel with JSON scans
+
+The travel-test helper submits two valid JSON scans with sequential counters.
+It defaults to Baku for the first scan and Sanliurfa for the second, using
+coordinates from the local simulator vault to generate valid CMACs:
+
+```powershell
+& $Python .\test-impossible-travel.py --uid 04ABCDEF123456
+```
+
+The two scans must happen within roughly 60 minutes for the Baku-to-Sanliurfa
+distance to exceed the server's 1,000 km/h threshold. The JSON coordinates are
+unverified advisory evidence. For physical NFC scans, the result page's
+**Share location and check travel** button submits browser GPS after tag
+authentication; the dashboard marks that scan as `SPEED_ANOMALY` when the
+same threshold is exceeded. GeoIP is not used to calculate travel speed.
+
 ## Other useful commands
 
 Export a manifest without keys:
