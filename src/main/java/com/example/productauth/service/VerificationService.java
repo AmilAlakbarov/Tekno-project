@@ -219,6 +219,12 @@ public class VerificationService {
         return VerifyResponse.fake(message);
     }
 
+    private VerifyResponse recordFailure(String uid, String ipAddress, ScanResult result, NfcTag tag,
+            String message, Integer receivedCounter, Integer expectedCounter, GeoIpLocation geoLocation) {
+        saveIfNew(uid, null, null, ipAddress, result, receivedCounter, expectedCounter, geoLocation);
+        return VerifyResponse.fake(message);
+    }
+
     private ScanLog saveSuccessfulLog(String uid, Double latitude, Double longitude, String ipAddress,
             Integer receivedCounter, Integer expectedCounter, GeoIpLocation geoLocation) {
         if (scanLogRepository.existsByTagUidAndReceivedCounterAndScanResult(uid, receivedCounter, ScanResult.REAL)) {
