@@ -155,7 +155,7 @@ public class VerificationService {
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
         if (hasTravelAnomaly(normalizedUid, null, null, geoLocation.orElse(null))) {
-            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+            return recordFailure(uid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
                     "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1,
                     geoLocation.orElse(null));
         }
@@ -186,7 +186,7 @@ public class VerificationService {
                 .findTopByTagUidAndScanResultInAndIdNotOrderByScannedAtDesc(
                         normalizedUid, TRAVEL_ELIGIBLE_RESULTS, currentScan.getId());
         TravelAssessment assessment = previousScan
-                .map(previous -> assessTravel(previous, latitude, longitude))
+                .map(previous -> assessTravel(previous, latitude, longitude, null))
                 .orElse(null);
         currentScan.setDeviceLocation(latitude, longitude);
         if (assessment != null && assessment.anomaly()) {

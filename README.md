@@ -29,22 +29,26 @@ hardware security modules. Do not use demo keys for real products.
 - Source-IP recording and optional local MaxMind GeoLite2 City enrichment for
   successfully verified scans; client IPs are never sent to a lookup service
 
+
 Impossible-travel detection compares the latitude and longitude submitted with
 each successful JSON verification against the latest successful scan. When
 available, a previously shared device location is preferred for the prior
 scan; otherwise its submitted coordinates are used. This is user-provided
 location evidence: it may be inaccurate or spoofed and is an advisory fraud
-signal, not proof of physical location. GeoIP remains separate contextual
-evidence and does not drive the travel-speed decision. Public NFC URL scans do
-not include coordinates, so they cannot contribute a location to this check.
+signal, not proof of physical location. When exact coordinates are unavailable,
+the check falls back to locally resolved GeoIP coordinates. GeoIP is approximate
+and can produce false positives due to VPNs, proxies, or mobile-carrier routing.
+Public NFC URL scans do not include coordinates, so their travel check depends
+on GeoIP evidence when available.
 
 The dashboard overview map uses OpenStreetMap tiles and plots up to 100 recent
-verified scan locations, preferring user-shared device GPS when available and
-otherwise using approximate GeoIP points. After a successful NFC verification,
+verified scan locations, preferring user-shared device GPS and submitted exact
+coordinates before approximate GeoIP points. GeoIP is suppressed in the display
+whenever exact-location coordinates are present. After a successful NFC verification,
 the result page offers an optional browser location-permission prompt. Declining
 does not affect NFC authentication. Shared device coordinates are user-provided,
 may be inaccurate or spoofed, and are stored as separate, untrusted evidence;
-they are not used for impossible-travel decisions. Map tile requests go from the
+they take precedence in impossible-travel decisions. Map tile requests go from the
 dashboard browser to OpenStreetMap and disclose the requested map area and
 browser IP to the tile provider; scan IPs are still resolved locally. The
 overview activity chart reports daily verified and flagged scan counts for the

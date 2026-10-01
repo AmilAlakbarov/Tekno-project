@@ -3,6 +3,8 @@ package com.example.productauth.service;
 import com.example.productauth.api.dto.AdminDtos;
 import com.example.productauth.domain.NfcTag;
 import com.example.productauth.domain.Product;
+import com.example.productauth.domain.ScanLog;
+import com.example.productauth.domain.ScanResult;
 import com.example.productauth.domain.TagStatus;
 import com.example.productauth.repository.NfcTagRepository;
 import com.example.productauth.repository.ProductRepository;
@@ -13,6 +15,7 @@ import org.springframework.data.domain.PageRequest;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
+import java.time.Instant;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
