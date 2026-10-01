@@ -144,8 +144,8 @@ public class NfcScanController {
         String locationShare = authentic
                 ? """
                   <section class="location-share">
-                    <p>Share this device's location to check for impossible travel between scans. This is advisory evidence and can be inaccurate or spoofed; NFC authentication is already complete.</p>
-                    <button id="share-location" type="button" data-uid="%s" data-counter="%s">Share location and check travel</button>
+                    <p>Send this device's GPS location. The server automatically compares it with earlier scans for impossible travel. Location is optional, may be inaccurate or spoofed, and does not affect NFC authentication.</p>
+                    <button id="share-location" type="button" data-uid="%s" data-counter="%s">Share GPS location</button>
                     <p id="location-status" role="status" aria-live="polite"></p>
                   </section>
                   <script>
@@ -180,8 +180,8 @@ public class NfcScanController {
                             ? `${Number(result.speedKmh).toFixed(0)} km/h`
                             : 'in less than one second';
                           status.textContent = result.travelAnomaly
-                            ? `Speed anomaly flagged (${Number(result.distanceKm).toFixed(0)} km ${speed}).`
-                            : 'Location was added to this scan. No impossible-travel anomaly was detected.';
+                            ? `The server flagged a speed anomaly (${Number(result.distanceKm).toFixed(0)} km ${speed}).`
+                            : 'GPS sent. The server found no impossible-travel anomaly.';
                           locationButton.textContent = result.travelAnomaly ? 'Travel anomaly flagged' : 'Location shared';
                           locationButton.disabled = true;
                         } catch (error) {

@@ -45,7 +45,8 @@ The dashboard overview map uses OpenStreetMap tiles and plots up to 100 recent
 verified scan locations, preferring user-shared device GPS and submitted exact
 coordinates before approximate GeoIP points. GeoIP is suppressed in the display
 whenever exact-location coordinates are present. After a successful NFC verification,
-the result page offers an optional browser location-permission prompt. Declining
+the result page offers an optional **Share GPS location** action; the backend
+automatically checks received GPS against earlier scans. Declining
 does not affect NFC authentication. Shared device coordinates are user-provided,
 may be inaccurate or spoofed, and are stored as separate, untrusted evidence;
 they take precedence in impossible-travel decisions. Map tile requests go from the

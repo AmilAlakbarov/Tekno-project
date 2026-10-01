@@ -103,12 +103,12 @@ Baku `40.4093, 49.8671` and Sanliurfa `37.1674, 38.7955`.
 The two scans must happen within roughly one hour for the Baku-to-Sanliurfa
 distance to exceed the server's 1,000 km/h threshold. The JSON coordinates are
 unverified advisory evidence. For physical NFC scans, the result page's
-**Share location and check travel** button submits browser GPS after tag
-authentication. When exact coordinates are unavailable, the backend can use
-local GeoIP coordinates as a fallback and marks scans above the same threshold
-as `SPEED_ANOMALY`. GeoIP is approximate and VPNs, proxies, and mobile-carrier
-routing can cause false positives; treat this as a demonstration signal, not
-proof of a tag clone or a person's location.
+**Share GPS location** button sends browser GPS after tag authentication; the
+server automatically checks it against earlier scan locations. GPS is preferred
+over submitted coordinates, with GeoIP used only when precise coordinates are
+unavailable. GeoIP is approximate and VPNs, proxies, and mobile-carrier routing
+can cause false positives; treat this as a demonstration signal, not proof of a
+tag clone or a person's location.
 
 ## Other useful commands
 
