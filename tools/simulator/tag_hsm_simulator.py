@@ -12,6 +12,7 @@ import csv
 import json
 import secrets
 import sys
+import uuid
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse
@@ -66,6 +67,10 @@ def validate_uid(uid: str) -> str:
 
 
 def generate(args: argparse.Namespace) -> None:
+    if not 1 <= args.count <= 1000:
+        raise ValueError("count must be between 1 and 1000")
+    if args.uid and args.count != 1:
+        raise ValueError("provide --uid for a single tag, or use --count to generate multiple tags")
     vault = read_json(args.vault)
     tags = vault.setdefault("tags", {})
     manifest = []
@@ -93,9 +98,14 @@ def generate(args: argparse.Namespace) -> None:
             break
     write_json(args.vault, vault)
     write_json(args.manifest, {"source": "development-hsm-simulator", "tags": manifest})
+    csv_output = args.csv_output or args.vault.with_name(
+        f"provisioning_batch_{uuid.uuid4().hex[:8]}.csv"
+    )
+    write_tags_csv(csv_output, [tags[item["uid"]] for item in manifest])
     print(f"Created {len(manifest)} simulated tag(s).")
     print(f"Vault: {args.vault}")
     print(f"Safe manifest: {args.manifest}")
+    print(f"Batch provisioning CSV: {csv_output}")
     for tag in manifest:
         print(f"  {tag['uid']}  {tag['displayName']}")
 
@@ -133,13 +143,18 @@ def export_manifest(args: argparse.Namespace) -> None:
 def export_csv(args: argparse.Namespace) -> None:
     vault = read_json(args.vault)
     tags = vault.get("tags", {})
-    args.output.parent.mkdir(parents=True, exist_ok=True)
-    with args.output.open("w", newline="", encoding="utf-8") as output:
+    write_tags_csv(args.output, list(tags.values()))
+    print(f"Wrote {len(tags)} provisioning row(s) to {args.output}.")
+
+
+def write_tags_csv(path: Path, tags: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with path.open("w", newline="", encoding="utf-8") as output:
         writer = csv.DictWriter(output, fieldnames=[
             "uid", "aesKey", "productId", "displayName", "description", "imageUrl"
         ])
         writer.writeheader()
-        for tag in tags.values():
+        for tag in tags:
             writer.writerow({
                 "uid": tag["uid"],
                 "aesKey": tag["aesKey"],
@@ -148,7 +163,53 @@ def export_csv(args: argparse.Namespace) -> None:
                 "description": tag.get("description", ""),
                 "imageUrl": tag.get("imageUrl", ""),
             })
-    print(f"Wrote {len(tags)} provisioning row(s) to {args.output}.")
+
+
+def import_csv(args: argparse.Namespace) -> None:
+    vault = read_json(args.vault)
+    tags = vault.setdefault("tags", {})
+    pending = {}
+    existing = 0
+    with args.input.open("r", newline="", encoding="utf-8-sig") as source:
+        reader = csv.DictReader(source)
+        columns = {name.strip().lower(): name for name in (reader.fieldnames or []) if name}
+        required = {"uid", "aeskey", "productid"}
+        if not required.issubset(columns):
+            raise ValueError("CSV must contain uid,aesKey,productId columns")
+        seen = set()
+        for row_number, row in enumerate(reader, start=2):
+            uid = validate_uid((row.get(columns["uid"]) or "").strip())
+            aes_key = (row.get(columns["aeskey"]) or "").strip().upper()
+            product_id = (row.get(columns["productid"]) or "").strip()
+            if len(aes_key) != 32:
+                raise ValueError(f"row {row_number}: aesKey must contain 32 hexadecimal characters")
+            try:
+                bytes.fromhex(aes_key)
+            except ValueError as exc:
+                raise ValueError(f"row {row_number}: aesKey must contain hexadecimal characters") from exc
+            if not product_id:
+                raise ValueError(f"row {row_number}: productId is required")
+            if uid in seen:
+                raise ValueError(f"row {row_number}: duplicate UID in CSV: {uid}")
+            seen.add(uid)
+            tag = {
+                "uid": uid,
+                "aesKey": aes_key,
+                "counter": 0,
+                "productId": product_id,
+                "displayName": (row.get(columns.get("displayname", "")) or "").strip() or f"Imported tag {uid}",
+                "description": (row.get(columns.get("description", "")) or "").strip(),
+                "imageUrl": (row.get(columns.get("imageurl", "")) or "").strip(),
+            }
+            if uid in tags:
+                if tags[uid].get("aesKey", "").upper() != aes_key:
+                    raise ValueError(f"CSV key conflicts with the simulator vault UID: {uid}")
+                existing += 1
+            else:
+                pending[uid] = tag
+    tags.update(pending)
+    write_json(args.vault, vault)
+    print(f"Imported {len(pending)} tag(s); {existing} matching tag(s) already existed.")
 
 
 class HsmHandler(BaseHTTPRequestHandler):
@@ -259,6 +320,8 @@ def parser() -> argparse.ArgumentParser:
     create.add_argument("--name")
     create.add_argument("--description")
     create.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
+    create.add_argument("--csv-output", type=Path,
+                        help="write a key-bearing CSV for only this generated batch")
     create.set_defaults(function=generate)
 
     make_url = sub.add_parser("sign", help="generate one SDM-style verification URL")
@@ -277,6 +340,10 @@ def parser() -> argparse.ArgumentParser:
     csv_export.add_argument("--output", type=Path,
                             default=Path(__file__).with_name("provisioning_keys.csv"))
     csv_export.set_defaults(function=export_csv)
+
+    csv_import = sub.add_parser("import-csv", help="import a provisioning CSV into the local simulator vault")
+    csv_import.add_argument("--input", type=Path, required=True)
+    csv_import.set_defaults(function=import_csv)
 
     server = sub.add_parser("serve", help="run the local development HSM HTTP service")
     server.add_argument("--bind", default="127.0.0.1")

@@ -94,14 +94,26 @@ public class AdminService {
                 .findTop100ByOrderByScannedAtDesc()
                 .stream()
                 .filter(log -> (log.getScanResult() == ScanResult.REAL
-                        || log.getScanResult() == ScanResult.SPEED_ANOMALY)
-                        && (log.getDeviceLatitude() != null && log.getDeviceLongitude() != null
-                        || log.getGeoLatitude() != null && log.getGeoLongitude() != null))
-                .map(log -> log.getDeviceLatitude() != null
-                        ? new AdminDtos.LocationPoint(log.getDeviceLatitude(), log.getDeviceLongitude(),
-                                "DEVICE_GPS", log.getScannedAt().toString())
-                        : new AdminDtos.LocationPoint(log.getGeoLatitude(), log.getGeoLongitude(),
-                                "GEOIP", log.getScannedAt().toString()))
+                        || log.getScanResult() == ScanResult.SPEED_ANOMALY))
+                .map(log -> {
+                    boolean exactLocationExists = log.getDeviceLatitude() != null
+                            || log.getDeviceLongitude() != null || log.getLatitude() != null
+                            || log.getLongitude() != null;
+                    if (log.getDeviceLatitude() != null && log.getDeviceLongitude() != null) {
+                        return new AdminDtos.LocationPoint(log.getDeviceLatitude(), log.getDeviceLongitude(),
+                                "DEVICE_GPS", log.getScannedAt().toString());
+                    }
+                    if (log.getLatitude() != null && log.getLongitude() != null) {
+                        return new AdminDtos.LocationPoint(log.getLatitude(), log.getLongitude(),
+                                "CLIENT_COORDINATES", log.getScannedAt().toString());
+                    }
+                    if (!exactLocationExists && log.getGeoLatitude() != null && log.getGeoLongitude() != null) {
+                        return new AdminDtos.LocationPoint(log.getGeoLatitude(), log.getGeoLongitude(),
+                                "GEOIP", log.getScannedAt().toString());
+                    }
+                    return null;
+                })
+                .filter(java.util.Objects::nonNull)
                 .toList();
     }
 

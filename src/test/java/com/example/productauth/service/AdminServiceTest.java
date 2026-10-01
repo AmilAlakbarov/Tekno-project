@@ -70,6 +70,22 @@ class AdminServiceTest {
     }
 
     @Test
+    void locationsPreferPreciseCoordinatesAndSuppressGeoIpFallback() {
+        when(scanLogRepository.findTop100ByOrderByScannedAtDesc()).thenReturn(List.of(
+                scan(ScanResult.REAL, null, null, 41.0, 49.0, 40.0, 50.0),
+                scan(ScanResult.REAL, 37.0, 39.0, null, null, 40.0, 50.0),
+                scan(ScanResult.REAL, null, null, null, null, 40.0, 50.0),
+                scan(ScanResult.REAL, 37.0, null, null, null, 40.0, 50.0)));
+
+        List<AdminDtos.LocationPoint> points = service.locations();
+
+        assertThat(points).containsExactly(
+                new AdminDtos.LocationPoint(41.0, 49.0, "DEVICE_GPS", Instant.EPOCH.toString()),
+                new AdminDtos.LocationPoint(37.0, 39.0, "CLIENT_COORDINATES", Instant.EPOCH.toString()),
+                new AdminDtos.LocationPoint(40.0, 50.0, "GEOIP", Instant.EPOCH.toString()));
+    }
+
+    @Test
     void bulkActionNormalizesUidsAndActivatesMatchingTags() {
         NfcTag first = tag("ABCDEFABCDEF01");
         NfcTag second = tag("11121314151617");
@@ -135,5 +151,19 @@ class AdminServiceTest {
     private NfcTag tag(String uid) {
         Product product = new Product(UUID.randomUUID(), "Widget", "Acme", null);
         return new NfcTag(UUID.randomUUID(), product, uid, "0123456789ABCDEF0123456789ABCDEF");
+    }
+
+    private ScanLog scan(ScanResult result, Double latitude, Double longitude,
+            Double deviceLatitude, Double deviceLongitude, Double geoLatitude, Double geoLongitude) {
+        ScanLog log = mock(ScanLog.class);
+        when(log.getScanResult()).thenReturn(result);
+        when(log.getLatitude()).thenReturn(latitude);
+        when(log.getLongitude()).thenReturn(longitude);
+        when(log.getDeviceLatitude()).thenReturn(deviceLatitude);
+        when(log.getDeviceLongitude()).thenReturn(deviceLongitude);
+        when(log.getGeoLatitude()).thenReturn(geoLatitude);
+        when(log.getGeoLongitude()).thenReturn(geoLongitude);
+        when(log.getScannedAt()).thenReturn(Instant.EPOCH);
+        return log;
     }
 }

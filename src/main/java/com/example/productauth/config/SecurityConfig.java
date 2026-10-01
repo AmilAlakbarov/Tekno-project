@@ -61,6 +61,7 @@ public class SecurityConfig {
                 .requestMatchers("/api/v1/auth/csrf", "/api/v1/auth/login", "/api/v1/auth/logout", "/api/v1/verify", "/nfc/**").permitAll()
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
                 .requestMatchers("/api/v1/admin/accounts/**").hasRole("ADMIN")
+                .requestMatchers("/api/v1/admin/provisioning/*/keys.csv").hasRole("ADMIN")
                 .requestMatchers(HttpMethod.GET, "/api/v1/admin/**").hasAnyRole("ADMIN", "OPERATOR", "VIEWER")
                 .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "OPERATOR")
                 .anyRequest().permitAll())

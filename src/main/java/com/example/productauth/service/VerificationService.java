@@ -86,9 +86,10 @@ public class VerificationService {
         }
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
-        if (hasTravelAnomaly(uid, request.latitude(), request.longitude())) {
+        if (hasTravelAnomaly(uid, request.latitude(), request.longitude(), geoLocation.orElse(null))) {
             return recordFailure(request, ipAddress, ScanResult.SPEED_ANOMALY, tag,
-                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1);
+                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1,
+                    geoLocation.orElse(null));
         }
 
         tag.setLastScanCounter(counter);
@@ -153,6 +154,11 @@ public class VerificationService {
         }
 
         Optional<GeoIpLocation> geoLocation = geoIpService.lookup(ipAddress);
+        if (hasTravelAnomaly(normalizedUid, null, null, geoLocation.orElse(null))) {
+            return recordFailure(normalizedUid, ipAddress, ScanResult.SPEED_ANOMALY, tag,
+                    "Impossible travel speed detected.", counter, tag.getLastScanCounter() + 1,
+                    geoLocation.orElse(null));
+        }
         tag.setLastScanCounter(counter);
         nfcTagRepository.save(tag);
         saveSuccessfulLog(normalizedUid, null, null, ipAddress, counter, counter + 1,
@@ -200,6 +206,13 @@ public class VerificationService {
         return VerifyResponse.fake(message);
     }
 
+    private VerifyResponse recordFailure(VerifyRequest request, String ipAddress, ScanResult result, NfcTag tag,
+            String message, Integer receivedCounter, Integer expectedCounter, GeoIpLocation geoLocation) {
+        saveIfNew(request.uid().toUpperCase(), request.latitude(), request.longitude(), ipAddress, result,
+                receivedCounter, expectedCounter, geoLocation);
+        return VerifyResponse.fake(message);
+    }
+
     private VerifyResponse recordFailure(String uid, String ipAddress, ScanResult result, NfcTag tag,
             String message, Integer receivedCounter, Integer expectedCounter) {
         saveIfNew(uid, null, null, ipAddress, result, receivedCounter, expectedCounter);
@@ -239,6 +252,11 @@ public class VerificationService {
 
     private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
             ScanResult result, Integer receivedCounter, Integer expectedCounter) {
+        return saveIfNew(uid, latitude, longitude, ipAddress, result, receivedCounter, expectedCounter, null);
+    }
+
+    private ScanLog saveIfNew(String uid, Double latitude, Double longitude, String ipAddress,
+            ScanResult result, Integer receivedCounter, Integer expectedCounter, GeoIpLocation geoLocation) {
         if (result == ScanResult.REPLAY_ATTACK && !matchesLatestVerifiedScanIp(uid, ipAddress)) {
             log.info("Replay attempt rejected; its source IP does not match the latest verified scan.");
             return null;
@@ -248,7 +266,7 @@ public class VerificationService {
             return null;
         }
         return scanLogRepository.save(new ScanLog(uid, latitude, longitude, ipAddress, result,
-                receivedCounter, expectedCounter));
+                receivedCounter, expectedCounter, geoLocation));
     }
 
     private boolean matchesLatestVerifiedScanIp(String uid, String ipAddress) {
@@ -263,35 +281,47 @@ public class VerificationService {
                 .orElse(false);
     }
 
-    private boolean hasTravelAnomaly(String uid, double latitude, double longitude) {
+    private boolean hasTravelAnomaly(String uid, Double latitude, Double longitude, GeoIpLocation geoLocation) {
         Optional<ScanLog> previousOptional = scanLogRepository
                 .findTopByTagUidAndScanResultInOrderByScannedAtDesc(uid, TRAVEL_ELIGIBLE_RESULTS);
         if (previousOptional.isEmpty()) {
             return false;
         }
-        TravelAssessment assessment = assessTravel(previousOptional.get(), latitude, longitude);
+        TravelAssessment assessment = assessTravel(previousOptional.get(), latitude, longitude, geoLocation);
         return assessment != null && assessment.anomaly();
     }
 
-    private TravelAssessment assessTravel(ScanLog previous, double latitude, double longitude) {
-        Double previousLatitude = previous.getDeviceLatitude() != null
+    private TravelAssessment assessTravel(
+            ScanLog previous, Double latitude, Double longitude, GeoIpLocation geoLocation) {
+        Double previousLatitude = coordinatePairPresent(previous.getDeviceLatitude(), previous.getDeviceLongitude())
                 ? previous.getDeviceLatitude()
-                : previous.getLatitude();
-        Double previousLongitude = previous.getDeviceLongitude() != null
+                : coordinatePairPresent(previous.getLatitude(), previous.getLongitude())
+                        ? previous.getLatitude() : previous.getGeoLatitude();
+        Double previousLongitude = coordinatePairPresent(previous.getDeviceLatitude(), previous.getDeviceLongitude())
                 ? previous.getDeviceLongitude()
-                : previous.getLongitude();
-        if (previousLatitude == null || previousLongitude == null) {
-            log.info("Travel anomaly check skipped: latest verified scan has no submitted coordinates.");
+                : coordinatePairPresent(previous.getLatitude(), previous.getLongitude())
+                        ? previous.getLongitude() : previous.getGeoLongitude();
+        Double currentLatitude = coordinatePairPresent(latitude, longitude)
+                ? latitude : geoLocation == null ? null : geoLocation.latitude();
+        Double currentLongitude = coordinatePairPresent(latitude, longitude)
+                ? longitude : geoLocation == null ? null : geoLocation.longitude();
+        if (previousLatitude == null || previousLongitude == null
+                || currentLatitude == null || currentLongitude == null) {
+            log.info("Travel anomaly check skipped: exact coordinates or GeoIP coordinates are unavailable.");
             return null;
         }
 
-        double distanceKm = haversineKm(previousLatitude, previousLongitude, latitude, longitude);
+        double distanceKm = haversineKm(previousLatitude, previousLongitude, currentLatitude, currentLongitude);
         long elapsedSeconds = Duration.between(previous.getScannedAt(), java.time.Instant.now()).getSeconds();
         if (elapsedSeconds <= 0) {
             return new TravelAssessment(null, distanceKm, distanceKm > 0.001);
         }
         double speedKmh = distanceKm / (elapsedSeconds / 3600.0);
         return new TravelAssessment(speedKmh, distanceKm, speedKmh > MAX_SPEED_KMH);
+    }
+
+    private boolean coordinatePairPresent(Double latitude, Double longitude) {
+        return latitude != null && longitude != null;
     }
 
     static double haversineKm(double firstLatitude, double firstLongitude,

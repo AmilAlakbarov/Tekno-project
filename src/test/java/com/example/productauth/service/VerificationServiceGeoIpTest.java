@@ -187,7 +187,7 @@ class VerificationServiceGeoIpTest {
         assertThat(response.status()).isEqualTo("FAKE");
         ScanLog anomaly = capturedScanLog();
         assertThat(anomaly.getScanResult()).isEqualTo(ScanResult.SPEED_ANOMALY);
-        assertThat(anomaly.getGeoCountry()).isNull();
+        assertThat(anomaly.getGeoCountry()).isEqualTo("Country");
         assertThat(tag.getLastScanCounter()).isZero();
         verify(tags, never()).save(tag);
         verify(logs).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
@@ -286,19 +286,26 @@ class VerificationServiceGeoIpTest {
     }
 
     @Test
-    void publicNfcVerificationDoesNotUseGeoIpForImpossibleTravel() {
+    void publicNfcVerificationUsesGeoIpFallbackForImpossibleTravel() {
         when(signatures.matchesNtag424Sdm("04AABBCCDDEEFF", "000001", "mac-input",
                 "0011223344556677", tag.getAesKey())).thenReturn(true);
-        when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(
-                new GeoIpLocation("Country", "CC", "Region", "City", -40.0, -50.0)));
+        when(geoIp.lookup("8.8.8.8")).thenReturn(Optional.of(location));
+        ScanLog previous = mock(ScanLog.class);
+        when(previous.getGeoLatitude()).thenReturn(-40.0);
+        when(previous.getGeoLongitude()).thenReturn(-50.0);
+        when(previous.getScannedAt()).thenReturn(Instant.now().minusSeconds(60));
+        when(logs.findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+                "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY)))
+                .thenReturn(Optional.of(previous));
 
         VerifyResponse response = service.verifySdm(
                 "04AABBCCDDEEFF", "000001", "0011223344556677", "mac-input", "8.8.8.8");
 
-        assertThat(response.status()).isEqualTo("REAL");
-        assertThat(capturedScanLog().getGeoLatitude()).isEqualTo(-40.0);
-        assertThat(tag.getLastScanCounter()).isEqualTo(1);
-        verify(logs, never()).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
+        assertThat(response.status()).isEqualTo("FAKE");
+        assertThat(capturedScanLog().getScanResult()).isEqualTo(ScanResult.SPEED_ANOMALY);
+        assertThat(capturedScanLog().getGeoLatitude()).isEqualTo(40.0);
+        assertThat(tag.getLastScanCounter()).isZero();
+        verify(logs).findTopByTagUidAndScanResultInOrderByScannedAtDesc(
                 "04AABBCCDDEEFF", List.of(ScanResult.REAL, ScanResult.SPEED_ANOMALY));
     }
 
@@ -310,6 +317,10 @@ class VerificationServiceGeoIpTest {
         assertThat(tampered.getGeoCountry()).isNull();
         assertThat(tampered.getGeoLatitude()).isNull();
         assertThat(tampered.getGeoLongitude()).isNull();
+
+        ScanLog speedAnomaly = new ScanLog("04AABBCCDDEEFF", null, null, "8.8.8.8",
+                ScanResult.SPEED_ANOMALY, 1, 1, location);
+        assertThat(speedAnomaly.getGeoCountry()).isEqualTo("Country");
     }
 
     @Test

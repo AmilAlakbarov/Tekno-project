@@ -95,7 +95,7 @@ function App() {
           <div className="topbar-meta"><span className="user-role">{user.role === 'VIEWER' ? 'VISITOR · READ ONLY' : user.role}</span><span className="live-pill"><span className="status-dot" /> LIVE</span><span className="avatar">{user.username.slice(0, 2).toUpperCase()}</span><button className="text-button" onClick={() => authApi.logout().then(() => setUser(null))}>Log out</button></div>
         </header>
         <div className="page-content">
-          {page === 'tags' ? <TagsPage readOnly={!canManage} /> : page === 'provisioning' && canManage ? <ProvisioningPage /> : page === 'security' ? <SecurityPage /> : page === 'accounts' && user.role === 'ADMIN' ? <AccountsPage user={user} /> : <HomePage navigate={navigate} />}
+          {page === 'tags' ? <TagsPage readOnly={!canManage} /> : page === 'provisioning' && canManage ? <ProvisioningPage isAdmin={user.role === 'ADMIN'} /> : page === 'security' ? <SecurityPage /> : page === 'accounts' && user.role === 'ADMIN' ? <AccountsPage user={user} /> : <HomePage navigate={navigate} />}
         </div>
       </main>
     </div>
@@ -123,6 +123,7 @@ function HomePage({ navigate }) {
   const [locations, setLocations] = useState([])
   const [activity, setActivity] = useState([])
   const [error, setError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
 
   const load = async () => {
     try {
@@ -138,11 +139,15 @@ function HomePage({ navigate }) {
       setError('')
     } catch { setError('Unable to reach the API. Check VITE_API_URL and that the backend is running.') }
   }
+  const refreshNow = async () => {
+    setRefreshing(true)
+    try { await load() } finally { setRefreshing(false) }
+  }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
   const successRate = overview?.successRate ?? 0
 
   return <div className="stack">
-    <div className="page-intro"><div><p className="muted">A clear view of your physical product identity network.</p></div><span className="refresh-label">Auto-refreshes every 15s</span></div>
+    <div className="page-intro"><div><p className="muted">A clear view of your physical product identity network.</p></div><div className="page-actions"><span className="refresh-label">Auto-refreshes every 15s</span><button className="outline-button" onClick={refreshNow} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh now'}</button></div></div>
     {error && <div className="error-banner">{error}</div>}
     <div className="stats-grid">
       <StatCard label="ACTIVE TAGS" value={number(overview?.activeTags)} detail={`${number(overview?.totalTags)} registered total`} accent="purple" />
@@ -210,8 +215,10 @@ function LocationMap({ locations }) {
       <Popup>
         <strong>{point.source === 'DEVICE_GPS'
           ? 'User-shared device GPS (unverified)'
-          : 'GeoLite2 City · approximate IP location'}</strong><br />
-        {point.latitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}, {point.longitude.toFixed(point.source === 'DEVICE_GPS' ? 5 : 3)}
+          : point.source === 'CLIENT_COORDINATES'
+            ? 'Client-supplied coordinates (untrusted)'
+            : 'GeoLite2 City · approximate IP location'}</strong><br />
+        {point.latitude.toFixed(point.source === 'GEOIP' ? 3 : 5)}, {point.longitude.toFixed(point.source === 'GEOIP' ? 3 : 5)}
         {point.timestamp && <><br />{exactTime(point.timestamp)}</>}
       </Popup>
     </CircleMarker>)}
@@ -248,12 +255,19 @@ function ScanTable({ rows, security = false }) {
     const deviceCoordinates = row.deviceLatitude != null && row.deviceLongitude != null
       ? `${Number(row.deviceLatitude).toFixed(5)}, ${Number(row.deviceLongitude).toFixed(5)}`
       : ''
+    const exactLocationExists = row.deviceLatitude != null || row.deviceLongitude != null
+      || row.latitude != null || row.longitude != null
+    const clientCoordinates = row.latitude != null && row.longitude != null
+      ? `${Number(row.latitude).toFixed(5)}, ${Number(row.longitude).toFixed(5)}`
+      : ''
     const locationEvidence = deviceCoordinates
       ? `User-shared device GPS (unverified): ${deviceCoordinates}`
-      : geoPlace
-      ? `GeoLite2 City · approximate IP location: ${geoPlace}${row.geoCountryIsoCode ? ` (${row.geoCountryIsoCode})` : ''}${geoCoordinates ? ` · ${geoCoordinates}` : ''}`
-      : row.latitude != null && row.longitude != null
-        ? `Client-supplied coordinates (untrusted): ${Number(row.latitude).toFixed(3)}, ${Number(row.longitude).toFixed(3)}`
+      : clientCoordinates
+        ? `Client-supplied coordinates (untrusted): ${clientCoordinates}`
+        : exactLocationExists
+          ? 'Precise location evidence supplied (incomplete)'
+          : geoPlace
+            ? `GeoLite2 City · approximate IP location: ${geoPlace}${row.geoCountryIsoCode ? ` (${row.geoCountryIsoCode})` : ''}${geoCoordinates ? ` · ${geoCoordinates}` : ''}`
         : 'No GPS or GeoIP location'
     return <tr key={row.id || `${row.uid}-${row.timestamp}-${index}`}><td data-label="TAG UID"><code>{row.uid || '—'}</code></td><td data-label="TIME"><time className="scan-time" dateTime={row.timestamp || undefined} title={exactTime(row.timestamp)}><span>{timeAgo(row.timestamp)}</span><small>{exactTime(row.timestamp)}</small></time></td><td data-label="RESULT"><span className={`badge ${String(row.result || '').toLowerCase()}`}>{row.result || 'UNKNOWN'}</span></td><td data-label="RECEIVED CTR">{row.receivedCounter == null ? '—' : number(row.receivedCounter)}</td><td data-label="NEXT ACCEPTED CTR">{row.expectedCounter == null ? '—' : number(row.expectedCounter)}</td>{security && <><td data-label="LOCATION">{locationEvidence}</td><td data-label="IP"><code>{row.ipAddress || '—'}</code></td></>}</tr>
   })}</tbody></table></div>
@@ -419,6 +433,7 @@ function SecurityPage() {
   const [events, setEvents] = useState([])
   const [verifiedScans, setVerifiedScans] = useState([])
   const [error, setError] = useState('')
+  const [refreshing, setRefreshing] = useState(false)
   const load = async () => {
     try {
       const [securityEvents, scans] = await Promise.all([adminApi.securityEvents(), adminApi.scans()])
@@ -427,20 +442,45 @@ function SecurityPage() {
       setError('')
     } catch { setError('Could not load security events.') }
   }
+  const refreshNow = async () => {
+    setRefreshing(true)
+    try { await load() } finally { setRefreshing(false) }
+  }
   useEffect(() => { load(); const timer = setInterval(load, 15000); return () => clearInterval(timer) }, [])
-  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><span className="refresh-label">Auto-refreshes every 15s</span></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{events.length} recorded events</strong><span>Each stored scan-log event</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={events} security /></section><section className="panel"><div className="panel-heading"><div><h2>Verified scan location evidence</h2><span className="muted">GeoIP evidence is derived locally from IP addresses; client-supplied coordinates are untrusted.</span></div></div><ScanTable rows={verifiedScans} security /></section></div>
+  return <div className="stack"><div className="page-intro"><p className="muted">Monitor suspicious scans and verification anomalies.</p><div className="page-actions"><span className="refresh-label">Auto-refreshes every 15s</span><button className="outline-button" onClick={refreshNow} disabled={refreshing}>{refreshing ? 'Refreshing…' : '↻ Refresh now'}</button></div></div>{error && <div className="error-banner">{error}</div>}<div className="security-summary"><div className="alert-card"><span className="alert-icon">!</span><div><strong>{events.length} recorded events</strong><span>Each stored scan-log event</span></div></div><div className="panel security-note"><span className="shield-icon">◈</span><div><strong>Verification integrity</strong><span>Events are read directly from the PostgreSQL-backed API.</span></div></div></div><section className="panel"><div className="panel-heading"><div><h2>Security event log</h2><span className="muted">Replay attempts, invalid signatures, and unknown tags</span></div></div><ScanTable rows={events} security /></section><section className="panel"><div className="panel-heading"><div><h2>Verified scan location evidence</h2><span className="muted">GeoIP is shown only when neither device GPS nor client coordinates were supplied.</span></div></div><ScanTable rows={verifiedScans} security /></section></div>
 }
 
-function ProvisioningPage() {
+function ProvisioningPage({ isAdmin }) {
   const [products, setProducts] = useState([])
   const [file, setFile] = useState(null)
   const [result, setResult] = useState(null)
   const [product, setProduct] = useState({ name: '', manufacturer: '' })
   const [error, setError] = useState('')
+  const [exporting, setExporting] = useState(false)
   const loadProducts = async () => { try { setProducts(await adminApi.products()) } catch { setError('Could not load products.') } }
   useEffect(() => { loadProducts() }, [])
   const create = async (event) => { event.preventDefault(); try { await adminApi.createProduct(product); setProduct({ name: '', manufacturer: '' }); await loadProducts() } catch { setError('Could not create the product.') } }
   const importFile = async () => { if (!file) return; try { setResult(await adminApi.importProvisioning(file)); setError(''); await loadProducts() } catch { setError('The provisioning CSV could not be imported.') } }
+  const exportBatch = async () => {
+    if (!result?.batchId || !isAdmin) return
+    const confirmed = window.confirm(`This will download AES keys for ${result.importedRows} tag(s) in this provisioning batch. The CSV is highly sensitive; store it securely and do not share it publicly. Continue?`)
+    if (!confirmed) return
+    setExporting(true)
+    try {
+      const blob = await adminApi.exportProvisioningKeys(result.batchId)
+      const url = URL.createObjectURL(blob)
+      const link = document.createElement('a')
+      link.href = url
+      link.download = `provisioning-${result.batchId}-keys.csv`
+      link.click()
+      URL.revokeObjectURL(url)
+      setError('')
+    } catch {
+      setError('The key CSV could not be exported. Check HSM availability and administrator permissions.')
+    } finally {
+      setExporting(false)
+    }
+  }
   const removeProduct = async (item) => {
     const hasKnownTagCount = Number.isInteger(item.tagCount)
     const linkedTags = hasKnownTagCount ? `${item.tagCount} attached tag${item.tagCount === 1 ? '' : 's'}` : 'all linked tags'
@@ -448,7 +488,7 @@ function ProvisioningPage() {
     if (!window.confirm(confirmation)) return
     try { await adminApi.deleteProduct(item.id); await loadProducts(); setError('') } catch { setError('The product could not be deleted.') }
   }
-  return <div className="stack"><div className="page-intro"><div><p className="muted">Import virtual NTAG records created by the desktop simulator. AES keys are never displayed.</p></div></div>{error && <div className="error-banner">{error}</div>}<div className="content-grid"><section className="panel"><div className="panel-heading"><div><h2>Create product</h2><span className="muted">Name and manufacturer are required.</span></div></div><form onSubmit={create} className="stack"><label>Product name<input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></label><label>Manufacturer<input value={product.manufacturer} onChange={(event) => setProduct({ ...product, manufacturer: event.target.value })} required /></label><button className="primary-button" type="submit">Create product</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Import provisioning CSV</h2><span className="muted">Required columns: uid, aesKey, productId</span></div></div><input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /><p className="muted">{file ? file.name : 'Choose the CSV exported by the desktop virtual-tag simulator.'}</p><button className="primary-button" disabled={!file} onClick={importFile}>Validate and import</button>{result && <div className="import-result"><strong>{result.status}</strong><span>{result.importedRows} imported · {result.duplicateRows} duplicates · {result.invalidRows} invalid</span></div>}</section></div><section className="panel"><div className="panel-heading"><div><h2>Products</h2><span className="muted">Select a product ID when creating virtual tags.</span></div></div>{products.length ? <div className="table-wrap"><table><thead><tr><th>NAME</th><th>MANUFACTURER</th><th>PRODUCT ID</th><th>ATTACHED TAGS</th><th /></tr></thead><tbody>{products.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.manufacturer}</td><td><code>{item.id}</code></td><td>{Number.isInteger(item.tagCount) ? number(item.tagCount) : 'Unknown'}</td><td><button className="danger-button" onClick={() => removeProduct(item)}>Delete</button></td></tr>)}</tbody></table></div> : <div className="empty-state">No products yet.</div>}</section></div>
+  return <div className="stack"><div className="page-intro"><div><p className="muted">Import virtual NTAG records created by the desktop simulator. Key exports are available only to administrators and are highly sensitive.</p></div></div>{error && <div className="error-banner">{error}</div>}<div className="content-grid"><section className="panel"><div className="panel-heading"><div><h2>Create product</h2><span className="muted">Name and manufacturer are required.</span></div></div><form onSubmit={create} className="stack"><label>Product name<input value={product.name} onChange={(event) => setProduct({ ...product, name: event.target.value })} required /></label><label>Manufacturer<input value={product.manufacturer} onChange={(event) => setProduct({ ...product, manufacturer: event.target.value })} required /></label><button className="primary-button" type="submit">Create product</button></form></section><section className="panel"><div className="panel-heading"><div><h2>Import provisioning CSV</h2><span className="muted">Required columns: uid, aesKey, productId</span></div></div><input type="file" accept=".csv,text/csv" onChange={(event) => setFile(event.target.files?.[0] || null)} /><p className="muted">{file ? file.name : 'Choose the CSV exported by the desktop virtual-tag simulator.'}</p><button className="primary-button" disabled={!file} onClick={importFile}>Validate and import</button>{result && <div className="import-result"><strong>{result.importedRows} tag{result.importedRows === 1 ? '' : 's'} provisioned · {result.status}</strong><span>{result.totalRows} CSV rows · {result.duplicateRows} duplicates · {result.invalidRows} invalid</span>{isAdmin && result.importedRows > 0 && <button className="outline-button" disabled={exporting} onClick={exportBatch}>{exporting ? 'Preparing secure CSV…' : 'Export AES-key CSV'}</button>}</div>}</section></div><section className="panel"><div className="panel-heading"><div><h2>Products</h2><span className="muted">Each product includes its attached tag count. Select a product ID when creating virtual tags.</span></div></div>{products.length ? <div className="table-wrap"><table><thead><tr><th>NAME</th><th>MANUFACTURER</th><th>PRODUCT ID</th><th>ATTACHED TAGS</th><th /></tr></thead><tbody>{products.map((item) => <tr key={item.id}><td>{item.name}</td><td>{item.manufacturer}</td><td><code>{item.id}</code></td><td>{Number.isInteger(item.tagCount) ? number(item.tagCount) : 'Unknown'}</td><td><button className="danger-button" onClick={() => removeProduct(item)}>Delete</button></td></tr>)}</tbody></table></div> : <div className="empty-state">No products yet.</div>}</section></div>
 }
 
 createRoot(document.getElementById('root')).render(<App />)

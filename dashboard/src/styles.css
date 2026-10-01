@@ -55,6 +55,7 @@ nav { display: grid; gap: 6px; }
 .page-content { max-width: 1400px; margin: auto; padding: 36px 4.5% 65px; }
 .stack { display: grid; gap: 22px; }
 .page-intro { display: flex; justify-content: space-between; align-items: center; min-height: 25px; }
+.page-actions { display: flex; align-items: center; gap: 12px; }
 .muted, .refresh-label { color: var(--muted); font-size: 12px; }
 .table-subtitle { display: block; margin-top: 4px; color: var(--muted); max-width: 220px; }
 .actions { white-space: nowrap; }
@@ -85,6 +86,7 @@ nav { display: grid; gap: 6px; }
 .text-button, .outline-button { border: 0; background: transparent; color: var(--green); font-size: 11px; }
 .outline-button { border: 1px solid var(--line); border-radius: 9px; padding: 8px 12px; }
 .outline-button:hover { background: var(--green-soft); }
+.outline-button:disabled { cursor: wait; opacity: .65; }
 .activity-totals { display: flex; gap: 18px; margin: -7px 0 12px; color: var(--muted); font-size: 10px; }
 .activity-totals strong { color: var(--ink); font-size: 13px; margin-right: 4px; }
 .activity-chart { height: 190px; display: flex; align-items: stretch; justify-content: space-around; gap: 10px; padding: 8px 8px 0; border-bottom: 1px solid var(--soft-line); }

@@ -52,9 +52,14 @@ public class AuthController {
     }
 
     @GetMapping("/me")
-    public LoginResponse me(Authentication authentication) {
-        return new LoginResponse(authentication.getName(), authentication.getAuthorities().stream()
+    public ResponseEntity<LoginResponse> me(Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()
+                || authentication instanceof AnonymousAuthenticationToken) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        LoginResponse response = new LoginResponse(authentication.getName(), authentication.getAuthorities().stream()
                 .map(a -> a.getAuthority().replace("ROLE_", "")).findFirst().orElse("VIEWER"));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/logout")

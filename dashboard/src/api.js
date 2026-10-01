@@ -75,6 +75,10 @@ export const adminApi = {
     form.append('file', file)
     return api.post('/api/v1/admin/provisioning/import', form).then(({ data }) => data)
   },
+  exportProvisioningKeys: (batchId) => api.get(
+    `/api/v1/admin/provisioning/${encodeURIComponent(batchId)}/keys.csv`,
+    { responseType: 'blob' }
+  ).then(({ data }) => data),
   accounts: () => api.get('/api/v1/admin/accounts').then(({ data }) => data),
   createAccount: (account) => api.post('/api/v1/admin/accounts', account).then(({ data }) => data),
   deleteAccount: (id) => api.delete(`/api/v1/admin/accounts/${encodeURIComponent(id)}`)

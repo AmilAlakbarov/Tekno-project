@@ -143,7 +143,7 @@ class HsmHandler(BaseHTTPRequestHandler):
                            {"error": "storage_unavailable"})
 
     def do_POST(self) -> None:
-        if self.path not in {"/v1/keys/import", "/v1/keys/delete",
+        if self.path not in {"/v1/keys/import", "/v1/keys/delete", "/v1/keys/export",
                              "/v1/cmac/verify", "/v1/ntag424/verify"}:
             _json_response(self, HTTPStatus.NOT_FOUND, {"error": "not_found"})
             return
@@ -156,6 +156,8 @@ class HsmHandler(BaseHTTPRequestHandler):
                 self._import_key(body)
             elif self.path == "/v1/keys/delete":
                 self._delete_key(body)
+            elif self.path == "/v1/keys/export":
+                self._export_keys(body)
             elif self.path == "/v1/cmac/verify":
                 self._verify_cmac(body)
             else:
@@ -208,6 +210,24 @@ class HsmHandler(BaseHTTPRequestHandler):
         _json_response(self, HTTPStatus.OK, {
             "uid": uid_text,
             "status": "deleted" if deleted else "not_found",
+        })
+
+    def _export_keys(self, body: dict[str, Any]) -> None:
+        requested = body.get("uids")
+        if not isinstance(requested, list) or not requested or len(requested) > 1000:
+            raise ValueError("uids must be a non-empty list of at most 1000 tag UIDs")
+        normalized = [_hex_value(uid, "uid", lengths={7}).hex().upper() for uid in requested]
+        if len(set(normalized)) != len(normalized):
+            raise ValueError("uids must not contain duplicates")
+        with _database() as connection:
+            rows = connection.execute(
+                "SELECT uid, aes_key FROM keys WHERE uid = ANY(%s)", (normalized,)
+            ).fetchall()
+        keys = {row[0]: bytes(row[1]).hex().upper() for row in rows}
+        if len(keys) != len(normalized):
+            raise ValueError("one or more requested keys are not present in HSM storage")
+        _json_response(self, HTTPStatus.OK, {
+            "keys": [{"uid": uid, "aesKey": keys[uid]} for uid in normalized],
         })
 
     def _verify_cmac(self, body: dict[str, Any]) -> None:

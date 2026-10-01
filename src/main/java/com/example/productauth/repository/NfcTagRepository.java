@@ -23,6 +23,8 @@ public interface NfcTagRepository extends JpaRepository<NfcTag, UUID> {
 
     List<NfcTag> findByProductId(UUID productId);
 
+    List<NfcTag> findByProvisioningBatchIdOrderByTagUidAsc(UUID provisioningBatchId);
+
     List<NfcTag> findByTagUidIn(List<String> tagUids);
 
     long countByProductId(UUID productId);

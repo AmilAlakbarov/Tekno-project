@@ -34,6 +34,8 @@ python tag_hsm_simulator.py generate `
 
 Each tag receives a unique 7-byte UID and random AES-128 key. To use a custom
 UID instead, omit `--count` and add `--uid 04ABCDEF123456`.
+The command also writes a key-bearing CSV for exactly that generated batch.
+Pass `--csv-output ".\my-batch.csv"` to choose the file location.
 
 The default files are:
 
@@ -43,7 +45,8 @@ The default files are:
 
 ## Provision the tags to AuthentiChain
 
-Export a CSV:
+Use the batch CSV path printed by `generate`. To export the entire local
+simulator vault instead:
 
 ```powershell
 python tag_hsm_simulator.py export-csv `
@@ -53,6 +56,16 @@ python tag_hsm_simulator.py export-csv `
 In the dashboard, select **Provisioning → Import provisioning CSV**, choose
 that file, and import it. The CSV requires `uid`, `aesKey`, and `productId`.
 Every product ID must exactly match an existing dashboard product UUID.
+To load a CSV into the local simulator vault, run:
+
+```powershell
+python tag_hsm_simulator.py import-csv --input ".\provisioning_keys.csv"
+```
+
+The simulator rejects duplicate UIDs in a file and refuses to overwrite an
+existing UID with a different key. All key-bearing CSV files are highly
+sensitive. The dashboard's batch-key export is available to administrators
+only, requires confirmation, and retrieves keys from the configured HSM.
 
 When the backend is configured with `HSM_BASE_URL` and `HSM_SERVICE_TOKEN`,
 the backend sends the AES key to the HSM's authenticated
@@ -91,8 +104,11 @@ The two scans must happen within roughly one hour for the Baku-to-Sanliurfa
 distance to exceed the server's 1,000 km/h threshold. The JSON coordinates are
 unverified advisory evidence. For physical NFC scans, the result page's
 **Share location and check travel** button submits browser GPS after tag
-authentication; the dashboard marks that scan as `SPEED_ANOMALY` when the
-same threshold is exceeded. GeoIP is not used to calculate travel speed.
+authentication. When exact coordinates are unavailable, the backend can use
+local GeoIP coordinates as a fallback and marks scans above the same threshold
+as `SPEED_ANOMALY`. GeoIP is approximate and VPNs, proxies, and mobile-carrier
+routing can cause false positives; treat this as a demonstration signal, not
+proof of a tag clone or a person's location.
 
 ## Other useful commands
 

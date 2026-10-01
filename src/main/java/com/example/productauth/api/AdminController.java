@@ -7,6 +7,8 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -114,6 +116,17 @@ public class AdminController {
             @RequestPart("file") MultipartFile file,
             @RequestHeader(value = "X-Admin-Actor", defaultValue = "local-admin") String actor) {
         return provisioningService.importCsv(file, actor);
+    }
+
+    @GetMapping("/provisioning/{batchId}/keys.csv")
+    public ResponseEntity<byte[]> exportProvisioningKeys(@PathVariable UUID batchId) {
+        byte[] csv = provisioningService.exportBatchCsv(batchId);
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename=\"provisioning-" + batchId + "-keys.csv\"")
+                .header(HttpHeaders.CACHE_CONTROL, "no-store, private")
+                .body(csv);
     }
 
     @PutMapping("/tags/{uid}/metadata")

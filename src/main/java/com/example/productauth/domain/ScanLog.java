@@ -90,7 +90,8 @@ public class ScanLog {
         this.tagUid = tagUid;
         this.latitude = latitude;
         this.longitude = longitude;
-        if (scanResult == ScanResult.REAL && geoLocation != null) {
+        if ((scanResult == ScanResult.REAL || scanResult == ScanResult.SPEED_ANOMALY)
+                && geoLocation != null) {
             this.geoCountry = geoLocation.country();
             this.geoCountryIsoCode = geoLocation.countryIsoCode();
             this.geoRegion = geoLocation.region();
